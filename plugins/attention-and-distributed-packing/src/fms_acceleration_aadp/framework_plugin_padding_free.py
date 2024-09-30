@@ -20,6 +20,7 @@ import warnings
 from fms_acceleration import AccelerationPlugin
 from peft import LoraConfig
 from transformers import DataCollatorForSeq2Seq, TrainingArguments
+from transformers.trainer_utils import RemoveColumnsCollator
 from trl import DataCollatorForCompletionOnlyLM  # pylint: disable=import-error
 import torch
 
@@ -71,7 +72,7 @@ class PaddingFreeAccelerationPlugin(AccelerationPlugin):
             # `DataCollatorForSeq2Seq` collate_fn,
             # otherwise the collation can be unreliable"
             return isinstance(
-                collate_fn, (DataCollatorForSeq2Seq, DataCollatorForCompletionOnlyLM)
+                collate_fn, (DataCollatorForSeq2Seq, DataCollatorForCompletionOnlyLM, RemoveColumnsCollator)
             )
 
         # This check is done here to only patch the attention forward
