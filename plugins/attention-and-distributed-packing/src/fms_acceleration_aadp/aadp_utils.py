@@ -20,6 +20,7 @@ import warnings
 # Third Party
 from transformers import DefaultDataCollator, default_data_collator
 import numpy as np
+import torch
 
 
 @dataclass
@@ -61,11 +62,15 @@ class DataCollatorWithFlattening(DefaultDataCollator):
 
 # from https://github.com/huggingface/trl/pull/1887
 def patch_torch_call_remove_padding(collate_fn):
-    _old_collate_torch_call = collate_fn.torch_call
+    torch_call_attr = "torch_call"
+    if not hasattr(collate_fn, torch_call_attr):
+        torch_call_attr = "__call__"
+    _old_collate_torch_call = getattr(collate_fn, torch_call_attr)
+    print(collate_fn.data_collator)
 
     def _torch_call_with_remove_pad(self, examples):
         batch = _old_collate_torch_call(examples)
-
+        print(batch)
         # logic for removing padding as found in later TRL releases
         attn_mask = batch.pop("attention_mask")
         batch["input_ids"] = batch["input_ids"][attn_mask.bool()].unsqueeze(0)
@@ -74,8 +79,7 @@ def patch_torch_call_remove_padding(collate_fn):
         batch["labels"][batch["position_ids"] == 0] = self.ignore_index
 
         return batch
-
-    collate_fn.torch_call = MethodType(_torch_call_with_remove_pad, collate_fn)
+    setattr(collate_fn, torch_call_attr, MethodType(_torch_call_with_remove_pad, collate_fn))
     return collate_fn
 
 
