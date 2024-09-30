@@ -71,6 +71,7 @@ class PaddingFreeAccelerationPlugin(AccelerationPlugin):
             # "The padding-free plugin currently only works with a
             # `DataCollatorForSeq2Seq` collate_fn,
             # otherwise the collation can be unreliable"
+            print(type(collate_fn))
             return isinstance(
                 collate_fn, (DataCollatorForSeq2Seq, DataCollatorForCompletionOnlyLM, RemoveColumnsCollator)
             )
