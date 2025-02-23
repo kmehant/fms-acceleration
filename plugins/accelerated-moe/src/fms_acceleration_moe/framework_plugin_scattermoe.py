@@ -69,7 +69,9 @@ class ScatterMoEAccelerationPlugin(AccelerationPlugin):
         rank, world_size = 0, 1
         if torch.distributed.is_initialized():
             world_size = torch.distributed.get_world_size()
-            rank = torch.distributed.get_rank()
+            import os
+            rank = int(os.environ["LOCAL_RANK"])
+            # rank = torch.distributed.get_rank()
 
         if not hasattr(model.config, "name_or_path") or not model.config.name_or_path:
             raise ValueError(
