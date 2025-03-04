@@ -27,9 +27,10 @@ from fms_acceleration import AccelerationPlugin
 from fms_acceleration.model_patcher import patch_target_module
 from peft import LoraConfig, prepare_model_for_kbit_training
 from peft.tuners.lora.model import LoraModel
-from transformers import AutoModelForCausalLM, TrainingArguments
+from transformers import AutoModelForCausalLM, TrainingArguments, Trainer
 from transformers.modeling_utils import is_fsdp_enabled
 from transformers.utils.import_utils import _is_package_available
+from accelerate import Accelerator
 import torch
 import torch.distributed
 
@@ -355,7 +356,7 @@ class AutoGPTQAccelerationPlugin(AccelerationPlugin):
         return model, modifiable_args
 
     def get_callbacks_and_ready_for_train(
-        self, model: torch.nn.Module = None, accelerator=None
+        self, model: torch.nn.Module = None, accelerator: Accelerator = None, trainer: Trainer = None, pretrained_module_name_or_path: str = None
     ):
         callbacks = []
         if (

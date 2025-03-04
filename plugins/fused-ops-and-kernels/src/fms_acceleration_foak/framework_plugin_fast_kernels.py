@@ -19,7 +19,8 @@ from typing import Dict, Set, Tuple
 from fms_acceleration import AccelerationPlugin, AccelerationPluginConfigError
 from peft import LoraConfig
 from peft.tuners.lora.layer import LoraLayer
-from transformers import PretrainedConfig, TrainingArguments
+from transformers import PretrainedConfig, TrainingArguments, Trainer
+from accelerate import Accelerator
 import torch
 
 # Local
@@ -184,7 +185,7 @@ class FastKernelsAccelerationPlugin(AccelerationPlugin):
         return model, modifiable_args
 
     def get_callbacks_and_ready_for_train(
-        self, model: torch.nn.Module = None, accelerator=None
+        self, model: torch.nn.Module = None, accelerator: Accelerator = None, trainer: Trainer = None, pretrained_module_name_or_path: str = None
     ):
         # This callback applies only for qpeft
         # should not install this for full FT and standard peft

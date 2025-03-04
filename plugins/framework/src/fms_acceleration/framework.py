@@ -18,7 +18,7 @@ import os
 
 # Third Party
 from accelerate import Accelerator
-from transformers import PreTrainedModel, TrainingArguments
+from transformers import PreTrainedModel, TrainingArguments, Trainer
 from transformers.utils import logging
 from transformers.utils.import_utils import _is_package_available
 import torch
@@ -218,7 +218,7 @@ class AccelerationFramework:
         return any(x.requires_augmentation for _, x in self.active_plugins)
 
     def get_callbacks_and_ready_for_train(
-        self, model: torch.nn.Module = None, accelerator: Accelerator = None
+        self, model: torch.nn.Module = None, accelerator: Accelerator = None, trainer: Trainer = None, pretrained_module_name_or_path: str = None
     ):
 
         # Local
@@ -257,5 +257,5 @@ class AccelerationFramework:
 
         cbks = []
         for _, plugin in self.active_plugins:
-            cbks.extend(plugin.get_callbacks_and_ready_for_train(model, accelerator))
+            cbks.extend(plugin.get_callbacks_and_ready_for_train(model, accelerator, trainer, pretrained_module_name_or_path))
         return cbks

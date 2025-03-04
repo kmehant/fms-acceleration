@@ -24,8 +24,9 @@ import warnings
 # Third Party
 from fms_acceleration import AccelerationPlugin
 from peft import LoraConfig, get_peft_model
-from transformers import AutoModelForCausalLM, BitsAndBytesConfig, TrainingArguments
+from transformers import AutoModelForCausalLM, BitsAndBytesConfig, TrainingArguments, Trainer
 from transformers.utils.import_utils import _is_package_available
+from accelerate import Accelerator
 import torch
 
 # Local
@@ -218,7 +219,7 @@ class BNBAccelerationPlugin(AccelerationPlugin):
         return model, modifiable_args
 
     def get_callbacks_and_ready_for_train(
-        self, model: torch.nn.Module = None, accelerator=None
+        self, model: torch.nn.Module = None, accelerator: Accelerator = None, trainer: Trainer = None, pretrained_module_name_or_path: str = None
     ):
         callbacks = []
         if (

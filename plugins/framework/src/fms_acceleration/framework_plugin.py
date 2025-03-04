@@ -21,7 +21,7 @@ import sys
 # Third Party
 from accelerate import Accelerator
 from peft import LoraConfig
-from transformers import TrainingArguments
+from transformers import TrainingArguments, Trainer
 import torch
 
 
@@ -186,7 +186,7 @@ class AccelerationPlugin:
         raise NotImplementedError
 
     def get_callbacks_and_ready_for_train(
-        self, model: torch.nn.Module = None, accelerator: Accelerator = None
+        self, model: torch.nn.Module = None, accelerator: Accelerator = None, trainer: Trainer = None, pretrained_module_name_or_path: str = None
     ):
         return []
 
