@@ -188,8 +188,8 @@ def get_checkpoint_meta_from_sharded_safetensor(
                     _insert(_map[f"{mod}.weight"], index, (k, stfile))
             else:
                 for mod in expert_map.get(m.group(1), expert_map.get(m.group(3))):
-                    _insert(_map[f"{mod}.lora_A.default.weight"], index, (k, stfile))
-                    _insert(_map[f"{mod}.lora_B.default.weight"], index, (k, stfile))
+                    _insert(_map[f"{mod}.lora_A"], index, (k, stfile))
+                    _insert(_map[f"{mod}.lora_B"], index, (k, stfile))
 
             assert mod is not None, f"cannot map '{rel_k}'"
 
@@ -197,7 +197,7 @@ def get_checkpoint_meta_from_sharded_safetensor(
         raise ValueError(
             f"Could not get safetensor map for '{prefix}' and '{instance_name}'"
         )
-
+    print("map", _map)
     return _map
 
 
