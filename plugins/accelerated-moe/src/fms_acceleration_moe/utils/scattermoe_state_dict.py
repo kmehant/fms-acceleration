@@ -172,6 +172,7 @@ def get_checkpoint_meta_from_sharded_safetensor(
                 f"Unable to handle key '{k}' with provided router_name "
                 f"'{router_name}' or expert_name '{expert_name}'"
             )
+        print(m)
         if m.group(1) == router_name:
             if lora:
                 _map["router.lora_A.default.weight"].append((k, stfile))

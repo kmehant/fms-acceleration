@@ -482,6 +482,7 @@ def recover_original_state_dict_from_checkpoint(
                     updated_lora_parts[lora_index + 1] = model_parts[model_index + 1]
 
                     # Return the updated lora parts as the model key
+                    print("lora_parts", ".".join(updated_lora_parts))
                     return ".".join(updated_lora_parts)
                 for i, lora_key in enumerate(scatter_keys):
                     new_model_key = transform_model_key(model_key, scatter_keys_fqdn[i])
