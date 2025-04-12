@@ -28,6 +28,7 @@ from .scattermoe_constants import (
     DIM_EXPERT,
     KEY_SCATTERMOE_ROUTER,
     PARAM_NAME_WEIGHT_SCATTERMOE,
+    PARAM_NAME_SHARED_EXPERT_SCATTERMOE,
 )
 
 # This function creates a dictionary of keys and paths into the the sharded
@@ -85,6 +86,7 @@ def get_checkpoint_meta_from_sharded_safetensor(
     instance_name: str,  # e.g., block_sparse_moe
     router_name: str = "gate",  # e.g., named "gate" within block_sparse_moe
     expert_name: str = "experts",  # e.g., named "experts" within block_sparse_moe
+    shared_expert_name: str = None, # e.g. named "shared_expert" within moe module
     expert_map: Dict = None,  # map -> [w1,w2,w3]
 ) -> Dict[str, List[Tuple]]:
     """
@@ -104,6 +106,7 @@ def get_checkpoint_meta_from_sharded_safetensor(
                 e.g., experts.w1 -> w1
             ii) specify mutiple strings in order of w1, w2, ...
                 e.g., input_linear|output_linear|input_linear
+        shared_expert_name (str): name of the shared expert if any
         expert_map (dict): This is used with pattern ii) described above in expert_name.
             If not specified, will be the identity map, e.g., w1 -> w1
     """
@@ -141,6 +144,8 @@ def get_checkpoint_meta_from_sharded_safetensor(
                 expert_map[n].append(PARAM_NAME_WEIGHT_SCATTERMOE[i])
         else:
             expert_map = {x: [x] for x in PARAM_NAME_WEIGHT_SCATTERMOE}
+        if shared_expert_name is not None:
+            expert_map[shared_expert_name] = [PARAM_NAME_SHARED_EXPERT_SCATTERMOE]
 
     # state dict -> weights
     # 'router.weight': [(k, file),...]
@@ -155,16 +160,22 @@ def get_checkpoint_meta_from_sharded_safetensor(
         # - gate.weight
         # - experts.0.w1.weight
         rel_k = k.replace(prefix, "")
+        print("prefix", prefix)
         # pylint: disable=anomalous-backslash-in-string
-        m = re.match(f"({router_name}|{expert_name})\.?(\d+)?\.?(\w+)?\.weight", rel_k)
+        # debug - remove weight but not right thing to do
+        shared_expert_name_re = ""
+        if shared_expert_name is not None:
+            shared_expert_name_re = f"|{shared_expert_name}"
+        m = re.match(f"({router_name}|{expert_name}{shared_expert_name_re})\.?(\d+)?\.?(\w+)?", rel_k)
         if m is None:
+            print("rel_k", rel_k)
             raise ValueError(
                 f"Unable to handle key '{k}' with provided router_name "
                 f"'{router_name}' or expert_name '{expert_name}'"
             )
         if m.group(1) == router_name:
             _map[KEY_SCATTERMOE_ROUTER].append((k, stfile))
-        elif m.group(1) in expert_name:
+        elif re.match(expert_name, m.group(1)):
             index = m.group(2)
             index = 0 if index is None else int(index)
             mod = None
@@ -172,6 +183,11 @@ def get_checkpoint_meta_from_sharded_safetensor(
                 _insert(_map[f"{mod}.weight"], index, (k, stfile))
 
             assert mod is not None, f"cannot map '{rel_k}'"
+        elif m.group(1) in shared_expert_name:
+            mod = None
+            suffix = ".".join(rel_k.split(".")[1:])
+            for mod in expert_map.get(m.group(1)):
+                _map[f"{mod}.{suffix}"].append((k, stfile))
 
     if len(_map) == 0:
         raise ValueError(
@@ -191,18 +207,22 @@ def _maybe_reshape_scattermoe_expert_weights(
     (_is_w1, _is_w2, _is_w3) = [
         f"{x}.weight" in scatter_key for x in PARAM_NAME_WEIGHT_SCATTERMOE
     ]
-
+    # NOTE
+    # changes here would break for other common moe models
+    # since these have been changed specific to llama4
+    # however, later in final version we should ideally control these operations 
+    # based on model mentioning it as a config in scattermoe_constants
     if _is_w1 or _is_w2 or _is_w3:
         if len(param.shape) == 2:
             param = param.view(num_experts, -1, param.shape[-1])
 
         if _is_w1 or _is_w3:
-            if param.shape[-2] == (2 * intermediate_size):
+            if param.shape[-1] == (2 * intermediate_size):
                 # cut it
                 if _is_w1:
-                    param = param[..., :intermediate_size, :]
+                    param = param[..., :, :intermediate_size]
                 else:
-                    param = param[..., intermediate_size:, :]
+                    param = param[..., :, intermediate_size:]
 
             # asumme these are linears
             # assert param.shape[-2] == intermediate_size, "wrong intermediate size"
@@ -210,7 +230,12 @@ def _maybe_reshape_scattermoe_expert_weights(
 
         # have to transpose for weights since scattermoe accepts the differen
         # order
-        param = param.permute(0, 2, 1)
+        # NOTE: 
+        # breaking change for other moe models
+        # this has to be controllable through scattermoe constants mentioning 
+        # how dimensions are arranged for experts in the original model
+        # llama4 does not need permute
+        # param = param.permute(0, 2, 1)
 
     return param
 
@@ -298,7 +323,10 @@ def get_state_dict_from_checkpoint_metadata(
             if KEY_SCATTERMOE_ROUTER in scatter_key:
                 k, fi = vs[0]  # only one item
                 param = files[fi].get_tensor(k)
-
+            # NOTE: extract shared expert weights
+            elif PARAM_NAME_SHARED_EXPERT_SCATTERMOE in scatter_key:
+                k, fi = vs[0]  # only one item
+                param = files[fi].get_tensor(k)
             elif len(vs) == 1:
                 k, fi = vs[0]  # only one item
                 # if its a non-router weight and its non-sharded

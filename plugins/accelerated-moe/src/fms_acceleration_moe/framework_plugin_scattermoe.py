@@ -36,6 +36,7 @@ class ScatterMoEAccelerationPlugin(AccelerationPlugin):
         "GraniteMoeForCausalLM",
         "MixtralForCausalLM",
         "GraniteMoeSharedForCausalLM",
+        "Llama4ForConditionalGeneration",
     ]
 
     def __init__(self, configurations: Dict[str, Dict]):
@@ -88,6 +89,12 @@ class ScatterMoEAccelerationPlugin(AccelerationPlugin):
             )
 
         model_name = model.config.name_or_path
+        # NOTE
+        # for some reason this is not being filled up
+        # this change is not for production
+        # this is meant only for llama4
+        if model.config.architectures is None:
+            model.config.architectures = set(["Llama4ForCausalLM", "Llama4ForConditionalGeneration"])
 
         self._moe_component_module_names = prepare_scattermoe(
             model,
@@ -98,6 +105,8 @@ class ScatterMoEAccelerationPlugin(AccelerationPlugin):
             disable_distributed=self._disable_distributed,
             mixed_precision=False,  # Currently this is hardcoded to OFF
         )
+        # printing the model to see how it is patched
+        print(model)
         return model, modifiable_args
 
     def get_callbacks_and_ready_for_train(
@@ -118,6 +127,7 @@ class ScatterMoEAccelerationPlugin(AccelerationPlugin):
                     getattr(layer, name)
                     for name in self._moe_component_module_names
                     for layer in model.modules()
+                    if hasattr(layer, name)
                     if layer.__class__.__name__ in _layers
                 ]
 

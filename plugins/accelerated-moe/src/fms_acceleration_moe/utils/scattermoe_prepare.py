@@ -35,6 +35,7 @@ from .scattermoe_constants import (
     KEY_REPLICATE,
     KEY_SCATTERMOE_ROUTER,
     get_scattermoe_conv_spec_from_archs,
+    get_shared_expert_cls_from_archs,
 )
 from .scattermoe_state_dict import (
     convert_state_dict,
@@ -127,7 +128,13 @@ def prepare_scattermoe(
         f"world size ({world_size}) " f"not divisible by ep_size ({ep_degree})."
     )
 
-    moe_num_experts: int = model.config.num_local_experts
+    # NOTE:
+    # mulitple breaking changes are included which would be massaged later
+    # llama4's config is wrapped inside text_config so we had to choose it that way
+    # in production use we ideally should be able to infer or by specifying this
+    # in scattermoe_constants.py
+
+    moe_num_experts: int = model.config.text_config.num_local_experts
     num_experts_per_device = moe_num_experts // ep_degree
     assert (
         moe_num_experts % ep_degree == 0
@@ -136,7 +143,14 @@ def prepare_scattermoe(
     # current rank of the device
     device = torch.device(f"{device_type}:{rank}")
 
-    if ep_degree == 1 and disable_distributed and is_fsdp_enabled() and rank == 0:
+    # NOTE:
+    # this change was needed since cpu ram efficient loading is faulty with FSDPv2
+    # therefore for now we will load the models to cpu so that we at least dont 
+    # end up with cuda OOM.
+    # large models can easily be trained now by bumping up your cpu memory
+    # once fsdpv2 fix falls in place we will revert this change back to its original form
+
+    if ep_degree == 1 and disable_distributed:
         device = torch.device("cpu")
 
     # get the scattermoe conversion spec
@@ -240,6 +254,7 @@ def prepare_scattermoe(
                 module_name,
                 router_name,
                 "|".join(expert_name),
+                "shared_expert"
             )
 
             # the parent module
@@ -259,8 +274,8 @@ def prepare_scattermoe(
                     prefix + "." + module_name + ".",
                     checkpoint_metadata,
                     getattr(parent, module_name).state_dict(),
-                    model.config.num_local_experts,
-                    model.config.intermediate_size,
+                    model.config.text_config.num_local_experts,
+                    model.config.text_config.intermediate_size,
                     dtype,
                 )
             else:
@@ -270,7 +285,7 @@ def prepare_scattermoe(
                     loc,
                     checkpoint_metadata,
                     num_experts_per_device,
-                    model.config.intermediate_size,
+                    model.config.text_config.intermediate_size,
                     expert_shards,
                     dtype,
                 )
@@ -290,19 +305,21 @@ def prepare_scattermoe(
             # - very hard to do patching, settle for module swap
             with _init_scattermoe_context():
                 moe = ScatterMoE(
-                    hidden_size=model.config.hidden_size,
-                    hidden_act=model.config.hidden_act,
-                    intermediate_size=model.config.intermediate_size,
+                    hidden_size=model.config.text_config.hidden_size,
+                    hidden_act=model.config.text_config.hidden_act,
+                    intermediate_size=model.config.text_config.intermediate_size,
                     num_experts=num_experts_per_device,
                     has_bias=has_bias,
                     mlp_arch=expert_mlp_spec,
-                    top_k=model.config.num_experts_per_tok,
+                    top_k=model.config.text_config.num_experts_per_tok,
                     dtype=model.dtype,
                     device=device,
                     ep_device_mesh=(
                         device_mesh[key_ep] if device_mesh is not None else None
                     ),
                     lora_config=lora_config,
+                    shared_expert_cls=get_shared_expert_cls_from_archs(model.config.architectures),
+                    shared_expert_args={"config": model.config.text_config},
                 )  #
 
             # the state dict logic below will not have lora adapters
