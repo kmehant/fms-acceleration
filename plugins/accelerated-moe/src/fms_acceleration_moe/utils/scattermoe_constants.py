@@ -15,9 +15,15 @@
 # Standard
 from typing import List
 
+import transformers.models as models
+
 # to be updated so that the parsers can work properly
 PARAM_NAME_ROUTER_SCATTERMOE = "router"
 PARAM_NAME_WEIGHT_SCATTERMOE = ["w1", "w2", "w3"]
+
+# NOTE
+# module that would be patched with would hold shared expert mlp in this key
+PARAM_NAME_SHARED_EXPERT_SCATTERMOE = "shared_expert"
 
 FILE_SAFETENSOR_INDEX = "model.safetensors.index.json"
 KEY_REPLICATE = "replicate"
@@ -61,6 +67,12 @@ SCATTERMOE_SPEC_HAS_GATE = "Gated"
 # - boolean flag indicating if the experts are sharded in the state dict.
 #   i.e., meaning the experts exist in seperate 2D Linear modules
 #   or all "combined" into a single 3D linear module.
+
+# llama4 NOTE
+# gate_up_proj down_proj are common and can be confused with shard expert which 
+# is also present in the moe module
+# therefore we had to provide in module.module format to be more specific
+
 SCATTERMOE_CONVERSION_SPEC = {
     "MixtralForCausalLM": (
         "MixtralSparseMoeBlock",
@@ -83,6 +95,34 @@ SCATTERMOE_CONVERSION_SPEC = {
         SCATTERMOE_SPEC_HAS_GATE,
         False,
     ),
+    "Llama4ForCausalLM": (
+        "Llama4TextMoe",
+        "router",
+        "experts.gate_up_proj|experts.down_proj|experts.gate_up_proj",
+        SCATTERMOE_SPEC_HAS_GATE,
+        False,
+    ),
+    "Llama4ForConditionalGeneration": (
+        "Llama4TextMoe",
+        "router",
+        "experts.gate_up_proj|experts.down_proj|experts.gate_up_proj",
+        SCATTERMOE_SPEC_HAS_GATE,
+        False,
+    ),
+}
+
+# NOTE
+# we handle if shared expert is being used or not 
+# we only support shared expert when its part of moe module and not outside 
+# like in the case of granite moe shared arch
+
+# architecture with specific shared expert class mapping
+SHARED_EXPERT_MAPPING = {
+    "Llama4ForConditionalGeneration": models.llama4.modeling_llama4.Llama4TextMLP,
+    "Llama4ForCausalLM": models.llama4.modeling_llama4.Llama4TextMLP,
+    "MixtralForCausalLM": None,
+    "GraniteMoeForCausalLM": None,
+    "GraniteMoeSharedForCausalLM": None,
 }
 
 
@@ -98,4 +138,17 @@ def get_scattermoe_conv_spec_from_archs(architectures: List[str]):
     raise ValueError(
         f"In order to configure ScatterMoe for archs '{architectures}' "
         "the conversion spect must be updated in scattermoe_constants.py"
+    )
+
+# helper to return shared expert class based on architectures
+def get_shared_expert_cls_from_archs(architectures: List[str]):
+    for archs, cls in SHARED_EXPERT_MAPPING.items():
+        archs = archs.split(",")
+        if any(x in archs for x in architectures):
+            return cls
+
+    # if not found
+    raise ValueError(
+        f"In order to configure ScatterMoe for archs '{architectures}' "
+        "the shared expert mapping must be updated in scattermoe_constants.py"
     )

@@ -190,6 +190,13 @@ class AccelerationFramework:
     ):
         # get the config
         archs = model.config.architectures
+        # NOTE
+        # specific handling code for llama4 
+        # may or may not break for other models
+        # ideally not good looking piece of code
+        # we will improve it in final version
+        if archs is None:
+            archs = set(["Llama4ForCausalLM", "Llama4ForConditionalGeneration"])
         model_archs = set(archs if archs is not None else [])
 
         # NOTE: this assumes that augmentation order does not matter

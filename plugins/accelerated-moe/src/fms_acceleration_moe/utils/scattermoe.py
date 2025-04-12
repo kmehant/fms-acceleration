@@ -188,7 +188,10 @@ class ScatteredExperts(torch.nn.Module):
 # - support expert parallel where the data is communicated via all_to_all
 # pylint: disable=too-many-instance-attributes
 class ScatterMoE(torch.nn.Module):
-
+    # NOTE
+    # llama4 has shared expert within the moe module making it hard for simple moe patching
+    # therefore we allow for passing shared expert cls and args to init shared expert module
+    # this will later be generalized to any model to include or not
     def __init__(
         self,
         hidden_size: int,
@@ -202,6 +205,8 @@ class ScatterMoE(torch.nn.Module):
         device: str = torch.device("cpu"),
         ep_device_mesh: DeviceMesh = None,
         lora_config: LoraConfig = None,
+        shared_expert_cls = None,
+        shared_expert_args: Tuple = None,
     ):
         """
         ScatterMoE is the module swap that replaces a sparse mixture-of-experts module
@@ -226,6 +231,8 @@ class ScatterMoE(torch.nn.Module):
             ep_device_mesh (torch.distributed.DeviceMesh): Optional, to be passed if there is
                 sharding. Only pass the mesh for the experts.
             lora_config (peft.LoraConfig): Optional, to be passed if lora is to be used.
+            shared_expert_cls (cls): Optional, shared expert cls used for initialization and shared expert operation
+            shared_expert_args (Tuple): Optional, set of arguments to be passed for shared expert initialization
         """
         assert (
             not has_bias
@@ -301,6 +308,9 @@ class ScatterMoE(torch.nn.Module):
                 dtype=dtype,
                 device=device,
             )
+        self.shared_expert = None
+        if shared_expert_cls is not None:
+            self.shared_expert = shared_expert_cls(**shared_expert_args).to(dtype=dtype)
 
     # referenced from dolomite-engine
     def _compute_routing_weights(self, hidden_states: torch.Tensor):
@@ -413,8 +423,13 @@ class ScatterMoE(torch.nn.Module):
         ScatterMoe.forward replaces the forward of the sparse
         mixture-of-expert module.
         """
+        # NOTE
+        # we modify the forward to be a mix of scatter moe kernels impl + shared expert impl
+        # shared expert impl would be plain torch code (no kernels)
+        # shared expert impl mimics how shared expert is included in llama4 original moe operations
 
         # flatten the batch dimension
+        original_hidden_states = hidden_states
         original_shape = hidden_states.shape  # take a record
         hidden_states = hidden_states.view(-1, self.hidden_size)
 
@@ -488,4 +503,4 @@ class ScatterMoE(torch.nn.Module):
         )
 
         # return hidden states and router logits
-        return (hidden_states.view(original_shape), router_logits)
+        return (hidden_states.view(original_shape) + self.shared_expert(original_hidden_states) if self.shared_expert else hidden_states.view(original_shape), router_logits)
