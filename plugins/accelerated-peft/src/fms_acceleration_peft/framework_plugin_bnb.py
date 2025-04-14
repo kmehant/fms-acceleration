@@ -147,8 +147,11 @@ class BNBAccelerationPlugin(AccelerationPlugin):
             bnb_4bit_compute_dtype=torch_dtype,
             **config_kwargs,
         )
-
-        model = AutoModelForCausalLM.from_pretrained(
+        
+        # change is very specific to handling llama4
+        # will be generalized in the future
+        from transformers import AutoModelForImageTextToText
+        model = AutoModelForImageTextToText.from_pretrained(
             model_name,
             torch_dtype=torch_dtype,
             quantization_config=bnb_config,
