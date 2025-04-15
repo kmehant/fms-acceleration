@@ -262,7 +262,6 @@ def convert_state_dict(
         dtype (torch.dtype):
     """
     target = OrderedDict()
-
     for scatter_key, vs in checkpoint_metadata.items():
         for state_key, _ in vs:
             state_key = state_key.replace(prefix, "")

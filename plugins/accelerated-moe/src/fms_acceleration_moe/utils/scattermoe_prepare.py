@@ -111,6 +111,7 @@ def prepare_scattermoe(
     device_type: str = "cuda",
     mixed_precision: bool = False,
     lora_config: LoraConfig = None,
+    is_quantized: bool = False,
 ):
 
     # guarded because may have third party package deps
@@ -267,6 +268,7 @@ def prepare_scattermoe(
                 ep_degree == 1
                 and (not is_fsdp_enabled() or is_local_dist_rank_0())
                 and not sharded_expert_ckpt  # cannot be a sharded checkpoint
+                and not is_quantized # if quantized we want to load weights from safetensors rather quantized state dict
             ):
                 # - if there is no sharding, and model is not loaded on the
                 #   meta device, we can simply convert the state dict

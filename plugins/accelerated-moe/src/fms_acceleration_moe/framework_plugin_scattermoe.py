@@ -19,6 +19,7 @@ from typing import Dict, Tuple
 from fms_acceleration import AccelerationPlugin
 from peft import LoraConfig
 from transformers import TrainingArguments
+import bitsandbytes
 import torch
 
 # Local
@@ -77,6 +78,7 @@ class ScatterMoEAccelerationPlugin(AccelerationPlugin):
         train_args: TrainingArguments,
         modifiable_args: Tuple[LoraConfig],
     ):
+        print("modifiable_args", modifiable_args)
         rank, world_size = 0, 1
         if torch.distributed.is_initialized():
             world_size = torch.distributed.get_world_size()
@@ -96,6 +98,18 @@ class ScatterMoEAccelerationPlugin(AccelerationPlugin):
         if model.config.architectures is None:
             model.config.architectures = set(["Llama4ForCausalLM", "Llama4ForConditionalGeneration"])
 
+
+        # stop gap logic to infer if model is quantized.
+        # if the model is quantized we dont want to use moe module weights from loaded
+        # state dict rather use it from safetensor on disk
+        # only tested for bnb
+        # HACK may be the module has an attribute is_quantized?
+        def is_quant(module):
+            if isinstance(module, bitsandbytes.nn.Linear4bit):
+                return True
+            return any(is_quant(child) for child in module.children())
+            
+        is_quantized = is_quant(model)
         self._moe_component_module_names = prepare_scattermoe(
             model,
             checkpoint_name_or_path=model_name,
@@ -104,6 +118,7 @@ class ScatterMoEAccelerationPlugin(AccelerationPlugin):
             ep_degree=self._ep_degree,
             disable_distributed=self._disable_distributed,
             mixed_precision=False,  # Currently this is hardcoded to OFF
+            is_quantized=is_quantized,
         )
         # printing the model to see how it is patched
         print(model)
