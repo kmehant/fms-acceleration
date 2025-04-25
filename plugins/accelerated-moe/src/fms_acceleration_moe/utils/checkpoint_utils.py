@@ -277,6 +277,14 @@ def get_state_dict_from_dcp_checkpoint(
     )
     return sd[KEY_MODEL]
 
+# function to get the state dict from zero checkpoint
+def get_state_dict_from_zero_checkpoint(
+    zero_checkpoint_dir: str,
+):
+    from deepspeed.utils.zero_to_fp32 import get_fp32_state_dict_from_zero_checkpoint
+    sd = get_fp32_state_dict_from_zero_checkpoint(zero_checkpoint_dir,tag=None,exclude_frozen_parameters=False)
+    print(sd)
+    return sd
 
 # function to get state dict from regular checkpoint
 def get_state_dict_from_safe_checkpoint(safe_checkpoint_dir: str):
@@ -477,6 +485,122 @@ def recover_original_state_dict_from_checkpoint(
 
     return sd
 
+# taken from transformers
+def shard_checkpoint(
+    state_dict,
+    max_shard_size,
+    weights_name,
+):
+    """
+    Splits a model state dictionary in sub-checkpoints so that the final size of each sub-checkpoint does not exceed a
+    given size.
+
+    The sub-checkpoints are determined by iterating through the `state_dict` in the order of its keys, so there is no
+    optimization made to make each sub-checkpoint as close as possible to the maximum size passed. For example, if the
+    limit is 10GB and we have weights of sizes [6GB, 6GB, 2GB, 6GB, 2GB, 2GB] they will get sharded as [6GB], [6+2GB],
+    [6+2+2GB] and not [6+2+2GB], [6+2GB], [6GB].
+
+    <Tip warning={true}>
+
+    If one of the model's weight is bigger than `max_shard_size`, it will end up in its own sub-checkpoint which will
+    have a size greater than `max_shard_size`.
+
+    </Tip>
+
+    Args:
+        state_dict (`Dict[str, torch.Tensor]`): The state dictionary of a model to save.
+        max_shard_size (`int` or `str`, *optional*, defaults to `"10GB"`):
+            The maximum size of each sub-checkpoint. If expressed as a string, needs to be digits followed by a unit
+            (like `"5MB"`).
+        weights_name (`str`, *optional*, defaults to `"pytorch_model.bin"`):
+            The name of the model save file.
+    """
+    logger.warning(
+        "Note that `shard_checkpoint` is deprecated and will be removed in v4.44. We recommend you using "
+        "split_torch_state_dict_into_shards from huggingface_hub library"
+    )
+    from transformers.utils.hub import convert_file_size_to_int
+    from transformers.pytorch_utils import id_tensor_storage
+    max_shard_size = convert_file_size_to_int(max_shard_size)
+
+    sharded_state_dicts = [{}]
+    last_block_size = 0
+    total_size = 0
+    storage_id_to_block = {}
+
+    for key, weight in state_dict.items():
+        # when bnb serialization is used the weights in the state dict can be strings
+        # check: https://github.com/huggingface/transformers/pull/24416 for more details
+        if isinstance(weight, str):
+            continue
+        else:
+            storage_id = id_tensor_storage(weight)
+
+        # If a `weight` shares the same underlying storage as another tensor, we put `weight` in the same `block`
+        if storage_id in storage_id_to_block and weight.device != torch.device(
+            "meta"
+        ):
+            block_id = storage_id_to_block[storage_id]
+            sharded_state_dicts[block_id][key] = weight
+            continue
+        # dtype_byte_size is no more supported in transformers
+        # due to its inaccuracies - https://github.com/huggingface/transformers/pull/37144
+        weight_size = weight.numel() * weight.element_size()
+        # If this weight is going to tip up over the maximal size, we split, but only if we have put at least one
+        # weight in the current shard.
+        if (
+            last_block_size + weight_size > max_shard_size
+            and len(sharded_state_dicts[-1]) > 0
+        ):
+            sharded_state_dicts.append({})
+            last_block_size = 0
+
+        sharded_state_dicts[-1][key] = weight
+        last_block_size += weight_size
+        total_size += weight_size
+        storage_id_to_block[storage_id] = len(sharded_state_dicts) - 1
+
+    # If we only have one shard, we return it
+    if len(sharded_state_dicts) == 1:
+        return {weights_name: sharded_state_dicts[0]}, None
+
+    # Otherwise, let's build the index
+    weight_map = {}
+    shards = {}
+    for idx, shard in enumerate(sharded_state_dicts):
+        shard_file = weights_name.replace(
+            ".bin", f"-{idx+1:05d}-of-{len(sharded_state_dicts):05d}.bin"
+        )
+        shard_file = shard_file.replace(
+            ".safetensors",
+            f"-{idx + 1:05d}-of-{len(sharded_state_dicts):05d}.safetensors",
+        )
+        shards[shard_file] = shard
+        for key in shard.keys():
+            weight_map[key] = shard_file
+
+    # Add the metadata
+    metadata = {"total_size": total_size}
+    index = {"metadata": metadata, "weight_map": weight_map}
+    return shards, index
+
+
+# no lora support
+# safe tensors saving does not seem to work due to shared tensors / weight tying
+def save_torch(input_state_dict: Dict, save_directory: str, max_shard_size: Union[int, str] = "5GB",):
+    from accelerate.utils.constants import WEIGHTS_NAME, WEIGHTS_INDEX_NAME
+    weights_name = WEIGHTS_NAME
+    shards, index = shard_checkpoint(input_state_dict, max_shard_size=max_shard_size, weights_name=weights_name)
+    for shard_file, shard in shards.items():
+        torch.save(shard, os.path.join(save_directory, shard_file))
+
+    if index is None:
+        logger.info(f"Model weights saved in {os.path.join(save_directory, WEIGHTS_NAME)}")
+    else:
+        save_index_file = os.path.join(save_directory, WEIGHTS_INDEX_NAME)
+        with open(save_index_file, "w", encoding="utf-8") as f:
+            content = json.dumps(index, indent=2, sort_keys=True) + "\n"
+            f.write(content)
 
 def save_sharded_safetensors(
     input_state_dict: Dict,
@@ -537,10 +661,12 @@ def save_sharded_safetensors(
 
 
 def recover_safetensors_from_dcp(
-    checkpoint_dir, pretrained_model_name_or_path, output_dir
+    checkpoint_dir, pretrained_model_name_or_path, output_dir, is_deepspeed=False
 ):
     if checkpoint_dir.startswith(FSDP_MODEL_NAME):
         loader = get_state_dict_from_dcp_checkpoint
+    elif is_deepspeed:
+        loader = get_state_dict_from_zero_checkpoint
     else:
         fsdp_checkpoint_dirs = [
             x
@@ -599,14 +725,16 @@ def recover_safetensors_from_dcp(
     state_dict = recover_original_state_dict_from_checkpoint(
         new_state_dict, _name_or_path
     )
-
-    # save it as a safetensors file
-    save_sharded_safetensors(
-        {k: v.contiguous() for k, v in state_dict.items()},
-        output_dir,
-        metadata={"format": "pt"},
-        lora=lora,
-    )
+    if is_deepspeed:
+        save_torch({k: v.contiguous() for k, v in state_dict.items()}, output_dir)
+    else:
+        # save it as a safetensors file
+        save_sharded_safetensors(
+            {k: v.contiguous() for k, v in state_dict.items()},
+            output_dir,
+            metadata={"format": "pt"},
+            lora=lora,
+        )
 
 
 # have it serve as a conversion script
@@ -632,6 +760,10 @@ if __name__ == "__main__":
     parser.add_argument(
         "output_dir", help="Path to the location to write the converted checkpoint."
     )
+    
+    parser.add_argument(
+        "is_deepspeed", help="if its a deepspeed zero checkpoint", default=False
+    )
 
     parser.add_argument(
         "pretrained_model_name_or_path",
@@ -645,5 +777,5 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     recover_safetensors_from_dcp(
-        args.checkpoint_dir, args.pretrained_model_name_or_path, args.output_dir
+        args.checkpoint_dir, args.pretrained_model_name_or_path, args.output_dir, is_deepspeed=args.is_deepspeed
     )
