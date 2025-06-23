@@ -116,7 +116,7 @@ class AccelerationFramework:
         # read the configs
         if configuration_file is not None:
             plugin_configs = read_configuration_file(configuration_file)
-
+        print("plugin_configs", plugin_configs)
         # if the configuration file was not specified or we cannot
         # get anything out from the configs
         if ACCELERATION_FRAMEWORK_ENV_KEY in os.environ and (
@@ -131,6 +131,7 @@ class AccelerationFramework:
         for selected_configs, cls in get_relevant_configuration_sections(
             plugin_configs
         ):
+            print("selected_configs", selected_configs)
             # then the model is to be installed
             # get the plugin
             plugin_name = str(cls.__name__)

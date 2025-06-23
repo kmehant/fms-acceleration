@@ -18,3 +18,4 @@
 # Local
 from .framework_plugin_autogptq import AutoGPTQAccelerationPlugin
 from .framework_plugin_bnb import BNBAccelerationPlugin
+from .framework_plugin_ct import CompressedTensorsAccelerationPlugin
