@@ -16,7 +16,8 @@ CONFIG_DIR=sample-configurations
 # ------------- MAIN CONFIGS -----------------
 SCENARIOS_CONFIG=scenarios.yaml
 DEFAULTS_CONFIG=defaults.yaml
-ACCELERATE_CONFIG=accelerate.yaml
+# ACCELERATE_CONFIG=accelerate.yaml # fsdp v1
+ACCELERATE_CONFIG=accelerate_fsdp2.yaml # fsdp v2
 
 # ------------- SCENARIO CONFIGS -----------------
 # this determines which is the default subset
