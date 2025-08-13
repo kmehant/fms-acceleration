@@ -128,9 +128,13 @@ class ScatterMoEAccelerationPlugin(AccelerationPlugin):
                 # to save DTensors propery
                 patch_huggingface_save_and_load_for_dtensors()
 
+                
+                if not hasattr(accelerator.state.fsdp_plugin, "fsdp_version") or accelerator.state.fsdp_plugin.fsdp_version == 1:
                 # call this to patch torch optim to not use
-                # foreach for dtensors
-                patch_torch_optim_foreach_to_not_apply_to_dtensors()
+                # foreach for dtensors only when fsdpv1 is used
+                # fsdpv2 with transformers does implicit replication to convert all to dtensors
+                # before grad norm and optimizer.step() operations
+                    patch_torch_optim_foreach_to_not_apply_to_dtensors()
 
         return callbacks
 
