@@ -16,6 +16,7 @@
 from .checkpoint_utils import (
     patch_huggingface_save_and_load_for_dtensors,
     recover_safetensors_from_dcp,
+    patch_huggingface_clip_grad_norm_fsdp2,
 )
 from .scattermoe_prepare import prepare_scattermoe
 

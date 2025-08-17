@@ -26,6 +26,7 @@ from .utils import (
     patch_huggingface_save_and_load_for_dtensors,
     patch_torch_optim_foreach_to_not_apply_to_dtensors,
     prepare_scattermoe,
+    patch_huggingface_clip_grad_norm_fsdp2,
 )
 
 
@@ -127,7 +128,6 @@ class ScatterMoEAccelerationPlugin(AccelerationPlugin):
                 # call this to patch the HF save and load functions to be able
                 # to save DTensors propery
                 patch_huggingface_save_and_load_for_dtensors()
-
                 
                 if not hasattr(accelerator.state.fsdp_plugin, "fsdp_version") or accelerator.state.fsdp_plugin.fsdp_version == 1:
                 # call this to patch torch optim to not use
@@ -135,6 +135,10 @@ class ScatterMoEAccelerationPlugin(AccelerationPlugin):
                 # fsdpv2 with transformers does implicit replication to convert all to dtensors
                 # before grad norm and optimizer.step() operations
                     patch_torch_optim_foreach_to_not_apply_to_dtensors()
+
+                if hasattr(accelerator.state.fsdp_plugin, "fsdp_version") and accelerator.state.fsdp_plugin.fsdp_version == 2:
+                    # when EP and FSDPv2 is used
+                    patch_huggingface_clip_grad_norm_fsdp2(accelerator)
 
         return callbacks
 

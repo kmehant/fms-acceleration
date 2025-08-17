@@ -19,6 +19,8 @@ import json
 import os
 import re
 import shutil
+import types
+import math
 
 # Third Party
 from accelerate.logging import get_logger
@@ -35,12 +37,14 @@ from transformers import PretrainedConfig
 from transformers.utils import CONFIG_NAME, SAFE_WEIGHTS_INDEX_NAME, SAFE_WEIGHTS_NAME
 import torch
 import torch.distributed.checkpoint as dcp
+from torch.distributed.tensor import DTensor
 
 # Local
 from .scattermoe_constants import (
     FILE_SAFETENSOR_INDEX,
     PARAM_NAME_ROUTER_SCATTERMOE,
     PARAM_NAME_WEIGHT_SCATTERMOE,
+    KEY_EXPERT_PARALLEL,
     get_scattermoe_conv_spec_from_archs,
 )
 from .scattermoe_state_dict import get_checkpoint_meta_from_sharded_safetensor
@@ -241,6 +245,9 @@ def patch_huggingface_save_and_load_for_dtensors():
     patch_target_module("transformers.trainer.load_fsdp_model", load_fsdp_model)
     patch_target_module("transformers.trainer.load_fsdp_optimizer", load_fsdp_optimizer)
 
+# function to monkey patch accelerator clip grad_norm
+def patch_huggingface_clip_grad_norm_fsdp2(accelerator):
+    accelerator.clip_grad_norm_ = types.MethodType(clip_grad_norm_, accelerator)
 
 # this function implements a trick to get the resolved cache file to acccess the safetensor
 # - NOTE: does not work if _dict_from_json_file is not called, such as in the case of GGUF files.
@@ -612,6 +619,48 @@ def recover_safetensors_from_dcp(
         lora=lora,
     )
 
+
+def clip_grad_norm_(self, parameters, max_norm, norm_type=2):
+    """grad norm patch when EP is enabled"""
+    # code inspired from
+    # https://github.com/pytorch/torchtitan/blob/72b16b13abc88ba08f3e1796e5caee09abd94554/torchtitan/distributed/utils.py#L398
+    ep_params = []
+    non_ep_params = []
+    ep_grads = []
+    non_ep_grads = []
+
+    for p in parameters:
+        if p.grad is None:
+            continue
+        if KEY_EXPERT_PARALLEL in p.device_mesh.mesh_dim_names:
+            ep_params.append(p)
+            ep_grads.append(p.grad)
+        else:
+            non_ep_params.append(p)
+            non_ep_grads.append(p.grad)
+    ep_grads_total_norm = torch.nn.utils.get_total_norm(
+        ep_grads, norm_type, False, True
+    )
+
+    if isinstance(ep_grads_total_norm, DTensor):
+        ep_grads_total_norm = ep_grads_total_norm.full_tensor()
+
+    non_ep_grads_total_norm = torch.nn.utils.get_total_norm(
+        non_ep_grads, norm_type, False, True
+    ).full_tensor()
+
+    if math.isinf(norm_type):
+        total_norm = torch.maximum(ep_grads_total_norm, non_ep_grads_total_norm)
+    else:
+        total_norm = (
+            ep_grads_total_norm**norm_type + non_ep_grads_total_norm**norm_type
+        )
+        total_norm **= 1.0 / norm_type
+
+    torch.nn.utils.clip_grads_with_norm_(ep_params, max_norm, total_norm, True)
+    torch.nn.utils.clip_grads_with_norm_(non_ep_params, max_norm, total_norm, True)
+
+    return total_norm
 
 # have it serve as a conversion script
 if __name__ == "__main__":
