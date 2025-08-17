@@ -632,6 +632,8 @@ def clip_grad_norm_(self, parameters, max_norm, norm_type=2):
     for p in parameters:
         if p.grad is None:
             continue
+        if p.device_mesh is None:
+            print(p)
         if KEY_EXPERT_PARALLEL in p.device_mesh.mesh_dim_names:
             ep_params.append(p)
             ep_grads.append(p.grad)
