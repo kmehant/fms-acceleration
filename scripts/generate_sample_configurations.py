@@ -152,6 +152,7 @@ KEY_AADP_MULTIPACK = "aadp-multipack"
 KEY_FAST_KERNELS = "foak-fast-kernels"
 KEY_FAST_KERNELS_LIGER = "foak-fast-kernels-liger"
 KEY_SCATTERMOE_EP1 = "moe-scattermoe-ep1"
+KEY_SCATTERMOE_KERNELS = "moe-scattermoe-kernels"
 KEY_SCATTERMOE_EP2 = 'moe-scattermoe-ep2'
 KEY_SCATTERMOE_EP4 = 'moe-scattermoe-ep4'
 KEY_SCATTERMOE_EP8 = 'moe-scattermoe-ep8'
@@ -190,6 +191,10 @@ CONFIGURATIONS = {
     KEY_FAST_KERNELS: "plugins/fused-ops-and-kernels/configs/fast_kernels.yaml",
     KEY_FAST_KERNELS_LIGER: "plugins/fused-ops-and-kernels/configs/fast_kernels_liger.yaml",
     KEY_SCATTERMOE_EP1: "plugins/accelerated-moe/configs/scattermoe.yaml",
+    KEY_SCATTERMOE_KERNELS: (
+        "plugins/accelerated-moe/configs/scattermoe.yaml",
+        [("training.moe.scattermoe.ep_degree", "true")],
+    ),
     KEY_SCATTERMOE_EP2: (
         "plugins/accelerated-moe/configs/scattermoe.yaml",
         [("training.moe.scattermoe.ep_degree", 2)],
@@ -226,8 +231,11 @@ COMBINATIONS = [
     ("foak-fast-kernels", (KEY_FAST_KERNELS,)),
     ("foak-fast-kernels-liger", (KEY_FAST_KERNELS_LIGER,)),
     ("moe-scattermoe-granite-ep1", (KEY_SCATTERMOE_EP1,)),
+    ("moe-scattermoe-kernels-granite", (KEY_SCATTERMOE_KERNELS,)),
     ("moe-scattermoe-granite-ep1-padding-free", (KEY_AADP_PADDING_FREE, KEY_SCATTERMOE_EP1,)),
     ("moe-scattermoe-granite-ep1-padding-free-foak", (KEY_AADP_PADDING_FREE, KEY_FAST_KERNELS, KEY_SCATTERMOE_EP1,)),
+    ("moe-scattermoe-kernels-granite-padding-free", (KEY_AADP_PADDING_FREE, KEY_SCATTERMOE_KERNELS,)),
+    ("moe-scattermoe-kernels-granite-padding-free-foak", (KEY_AADP_PADDING_FREE, KEY_FAST_KERNELS, KEY_SCATTERMOE_KERNELS,)),
     ("moe-scattermoe-granite-ep2", (KEY_SCATTERMOE_EP2,)),
     ("moe-scattermoe-granite-ep2-padding-free", (KEY_AADP_PADDING_FREE, KEY_SCATTERMOE_EP2,)),
     ("moe-scattermoe-granite-ep2-padding-free-foak", (KEY_AADP_PADDING_FREE, KEY_FAST_KERNELS, KEY_SCATTERMOE_EP2,)),

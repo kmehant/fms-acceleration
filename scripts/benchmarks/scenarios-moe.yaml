@@ -39,15 +39,18 @@ scenarios:
     -   name: accelerated-moe-full
         framework_config: 
             - # without acceleration
+            - moe-scattermoe-kernels-granite
             - moe-scattermoe-granite-ep1
             - moe-scattermoe-granite-ep2
-            - moe-scattermoe-granite-ep4
+            # - moe-scattermoe-granite-ep4
+            - moe-scattermoe-kernels-granite-padding-free
+            - moe-scattermoe-kernels-granite-padding-free-foak
             - moe-scattermoe-granite-ep1-padding-free
             - moe-scattermoe-granite-ep1-padding-free-foak
             - moe-scattermoe-granite-ep2-padding-free
             - moe-scattermoe-granite-ep2-padding-free-foak
-            - moe-scattermoe-granite-ep4-padding-free
-            - moe-scattermoe-granite-ep4-padding-free-foak
+            # - moe-scattermoe-granite-ep4-padding-free
+            # - moe-scattermoe-granite-ep4-padding-free-foak
         arguments:
             learning_rate: 5e-5
             torch_dtype: bfloat16
@@ -56,9 +59,9 @@ scenarios:
             logging_steps: 1
             packing: False
             adam_epsilon: 1e-8
-            model_name_or_path: 
-                - 'ibm-granite/granite-3.0-3b-a800m-instruct'
-                - 'ibm-research/moe-7b-1b-active-shared-experts'
+            model_name_or_path:
+                # - 'ibm-granite/granite-3.0-3b-a800m-instruct'
+                # - 'ibm-research/moe-7b-1b-active-shared-experts'
                 - 'ibm-granite/granite-4.0-tiny-preview'
 
 
