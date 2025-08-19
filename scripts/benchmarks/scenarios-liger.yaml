@@ -44,7 +44,7 @@ scenarios:
             learning_rate: 2e-5
             model_name_or_path: 
                 - 'mistralai/Mistral-7B-v0.1'
-                - 'meta-llama/Meta-Llama-3-8B'
+                # - 'meta-llama/Meta-Llama-3-8B'
             torch_dtype: bfloat16
             bf16: True
 
@@ -63,7 +63,7 @@ scenarios:
             target_modules: ["q_proj", "k_proj", "v_proj", "o_proj"]
             model_name_or_path: 
                 - 'mistralai/Mistral-7B-v0.1'
-                - 'meta-llama/Meta-Llama-3-8B'
+                # - 'meta-llama/Meta-Llama-3-8B'
 
     -   name: accelerated-peft-bnb
         framework_config: 
@@ -81,7 +81,7 @@ scenarios:
             target_modules: ["q_proj", "k_proj", "v_proj", "o_proj"]
             model_name_or_path: 
                 - 'mistralai/Mistral-7B-v0.1'
-                - 'meta-llama/Meta-Llama-3-8B'
+                # - 'meta-llama/Meta-Llama-3-8B'
 
     -   name: accelerated-peft-gptq
         framework_config: 
@@ -98,4 +98,4 @@ scenarios:
             target_modules: ["q_proj", "k_proj", "v_proj", "o_proj"]
             model_name_or_path: 
                 - 'TheBloke/Mistral-7B-v0.1-GPTQ'
-                - 'TechxGenus/Meta-Llama-3-8B-GPTQ'
+                # - 'TechxGenus/Meta-Llama-3-8B-GPTQ'
