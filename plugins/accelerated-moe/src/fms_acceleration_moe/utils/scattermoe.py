@@ -307,6 +307,7 @@ class ScatterMoE(torch.nn.Module):
 
         # router_logits: (batch * sequence_length, n_experts)
         weight = _maybe_get_local_tensor(self.router.weight)
+        print("weight.dtype", weight.dtype)
         bias = self.router.bias
         if bias:
             bias = _maybe_get_local_tensor(bias)
@@ -417,6 +418,7 @@ class ScatterMoE(torch.nn.Module):
         # flatten the batch dimension
         original_shape = hidden_states.shape  # take a record
         hidden_states = hidden_states.view(-1, self.hidden_size)
+        print("hidden_states.dtype", hidden_states.dtype)
 
         # compute the routing logits, weights, and expert assigments
         # - router_logits: will be passed out of forward, used for computing
