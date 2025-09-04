@@ -62,7 +62,7 @@ class CheckpointingAccelerationPlugin(AccelerationPlugin):
             accelerator is not None
             and getattr(accelerator.state, "fsdp_plugin", None) is not None
         ):
-            patch_activation_checkpointing_fsdp(accelerator=accelerator)
+            patch_activation_checkpointing_fsdp()
         return callbacks
 
 

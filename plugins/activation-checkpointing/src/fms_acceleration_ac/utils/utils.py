@@ -20,7 +20,7 @@ from accelerate.logging import get_logger
 logger = get_logger(__name__)
 
 # function to monkey patch activation checkpointing function
-def patch_activation_checkpointing_fsdp(level):
+def patch_activation_checkpointing_fsdp():
     from fms_acceleration.model_patcher import patch_target_module
 
     patch_target_module("accelerate.utils.fsdp_utils.fsdp2_apply_ac", fsdp2_apply_ac)
