@@ -31,7 +31,7 @@ def patch_activation_checkpointing_fsdp():
 # patch torch path or can we do it on import
 # apply_activation_checkpointing
 
-def fsdp2_apply_ac(accelerator, model):
+def fsdp2_apply_ac(accelerator=None, model=None):
     from torch.utils.checkpoint import create_selective_checkpoint_contexts, CheckpointPolicy
     from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
         checkpoint_wrapper,
@@ -55,7 +55,7 @@ def fsdp2_apply_ac(accelerator, model):
             layer = checkpoint_wrapper(layer, preserve_rng_state=False)
     return model
 
-def apply_activation_checkpointing(model, checkpoint_wrapper_fn, check_fn, auto_wrap_policy):
+def apply_activation_checkpointing(model, checkpoint_wrapper_fn=None, check_fn=None, auto_wrap_policy=None):
     from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
         checkpoint_wrapper,
     )
