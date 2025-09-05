@@ -36,7 +36,7 @@ class CheckpointingAccelerationPlugin(AccelerationPlugin):
         # level 2: decoder layer -> self_attn
         # level 3: decoder layer -> self_attn -> qkvo
         self._ac_level = self._check_config_and_maybe_check_values(
-            key="training.ac.level",
+            key="training.ac.lac.level",
             default=1,
         )
 
@@ -71,6 +71,6 @@ class CheckpointingAccelerationPlugin(AccelerationPlugin):
 AccelerationPlugin.register_plugin(
     CheckpointingAccelerationPlugin,
     configuration_and_paths=[
-        "training.ac",
+        "training.ac.lac",
     ],
 )
