@@ -42,6 +42,7 @@ def fsdp2_apply_ac(accelerator=None, model=None):
     #     else:
     #         return CheckpointPolicy.PREFER_RECOMPUTE
     level = model._ac_level
+    print("level", level)
     def chpk(l, module):
         if l==0:
             return
@@ -50,7 +51,7 @@ def fsdp2_apply_ac(accelerator=None, model=None):
             module.register_module(nm, checkpoint_wrapper(mod, preserve_rng_state=False))
 
     for layer in model.layers:
-        chpk(level, layer)
+        chpk(level-1, layer)
         if level>0:
             layer = checkpoint_wrapper(layer, preserve_rng_state=False)
     return model
@@ -60,6 +61,7 @@ def apply_activation_checkpointing(model, checkpoint_wrapper_fn=None, check_fn=N
         checkpoint_wrapper,
     )
     level = model._ac_level
+    print("level", level)
     def chpk(l, module):
         if l==0:
             return
@@ -68,7 +70,7 @@ def apply_activation_checkpointing(model, checkpoint_wrapper_fn=None, check_fn=N
             module.register_module(nm, checkpoint_wrapper(mod, preserve_rng_state=False))
 
     for layer in model.model.layers:
-        chpk(level, layer)
+        chpk(level-1, layer)
         if level>0:
             layer = checkpoint_wrapper(layer, preserve_rng_state=False)
 
