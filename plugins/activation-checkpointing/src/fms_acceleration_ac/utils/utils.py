@@ -57,10 +57,15 @@ def fsdp2_apply_ac(accelerator=None, model=None):
     return model
 
 def apply_activation_checkpointing(model, checkpoint_wrapper_fn=None, check_fn=None, auto_wrap_policy=None):
-    import torch
-    torch._dynamo.config.activation_memory_budget = 0.1
-    model = torch.compile(model)
-    return
+    from torch.utils.checkpoint import CheckpointPolicy, create_selective_checkpoint_contexts
+    from torch._functorch.partitioners import get_default_op_list
+    compute_intensive_ops = get_default_op_list().compute_intensive_ops
+    def policy_fn(ctx, op, *args, **kwargs):
+        if op in compute_intensive_ops:
+            return CheckpointPolicy.MUST_SAVE
+        else:
+            return CheckpointPolicy.MUST_RECOMPUTE
+    from functools import partial
     from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
         checkpoint_wrapper,
     )
@@ -71,12 +76,12 @@ def apply_activation_checkpointing(model, checkpoint_wrapper_fn=None, check_fn=N
             return
         for nm, mod in module.named_children():
             chpk(l-1, mod)
-            module.register_module(nm, checkpoint_wrapper(mod, preserve_rng_state=False))
+            module.register_module(nm, checkpoint_wrapper(mod, preserve_rng_state=False, context_fn=partial(create_selective_checkpoint_contexts, policy_fn)))
 
     for layer in model.model.layers:
         chpk(level-1, layer)
         if level>0:
-            layer = checkpoint_wrapper(layer, preserve_rng_state=False)
+            layer = checkpoint_wrapper(layer, preserve_rng_state=False,context_fn=partial(create_selective_checkpoint_contexts, policy_fn))
 
 # def apply_activation_checkpointing(model):
 #     from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
