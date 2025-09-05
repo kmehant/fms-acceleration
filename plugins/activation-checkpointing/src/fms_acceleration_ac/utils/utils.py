@@ -57,6 +57,10 @@ def fsdp2_apply_ac(accelerator=None, model=None):
     return model
 
 def apply_activation_checkpointing(model, checkpoint_wrapper_fn=None, check_fn=None, auto_wrap_policy=None):
+    import torch
+    torch._dynamo.config.activation_memory_budget = 0.1
+    model = torch.compile(model)
+    return
     from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
         checkpoint_wrapper,
     )
