@@ -2,7 +2,7 @@
 from datasets import IterableDataset, Dataset, IterableDatasetDict, DatasetDict
 from typing import Union, List
 from logging import getLogger
-from odm import OnlineData
+from .odm import OnlineData
 from tuning.data.setup_dataprocessor import _process_dataconfig_file, _process_raw_data_args, is_pretokenized_dataset
 from tuning.data.data_preprocessing_utils import get_data_collator
 
