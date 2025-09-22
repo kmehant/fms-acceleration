@@ -35,7 +35,7 @@ class OnlineData(IterableDataset):
         self.eta = eta
         self.collators_dict = collators_dict
         for k, _ in dataset_dict.items():
-            dataset_dict[k] = DataLoader(dataset_dict[k], 1, shuffle=False, num_workers=1, collate_fn=collators_dict[k])
+            dataset_dict[k] = iter(DataLoader(dataset_dict[k], 1, shuffle=False, num_workers=1, collate_fn=collators_dict[k]))
         self.dataset_dict = dataset_dict
         self.category_list = sorted(dataset_dict.keys())
         self.id2cat = {i: c for i, c in enumerate(self.category_list)}
