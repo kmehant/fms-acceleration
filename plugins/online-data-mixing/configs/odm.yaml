@@ -1,0 +1,7 @@
+training:
+  odm:
+    strategy: entropy # reward to use
+    update_steps: 1 # step interval to update Exp3 weights
+    sampling_strategy: steps # steps or samples
+    sampling_interval: 20 # sampling every 20 steps or 20 samples
+
