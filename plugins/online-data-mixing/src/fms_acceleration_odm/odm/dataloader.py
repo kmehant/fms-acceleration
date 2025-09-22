@@ -65,6 +65,7 @@ class OnlineData(IterableDataset):
         sample = next(self.dataset_dict[self.id2cat[arm_idx]])
         self.curr_idx[arm_idx] += 1
         self.produced += 1
+        logger.info(f"sample: {sample}")
         return sample
 
     def update_weights(self, batch_categories, rewards):
