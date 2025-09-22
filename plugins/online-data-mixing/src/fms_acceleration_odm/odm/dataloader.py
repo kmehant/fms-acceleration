@@ -34,9 +34,9 @@ class OnlineData(IterableDataset):
         self.gamma = gamma
         self.eta = eta
         self.collators_dict = collators_dict
-        self.dataset_dict = dataset_dict
         for k, _ in dataset_dict.items():
             dataset_dict[k] = DataLoader(dataset_dict[k], 1, shuffle=False, num_workers=1, collate_fn=collators_dict[k])
+        self.dataset_dict = dataset_dict
         self.category_list = sorted(dataset_dict.keys())
         self.id2cat = {i: c for i, c in enumerate(self.category_list)}
         self.total_categories = len(self.category_list)
@@ -61,8 +61,7 @@ class OnlineData(IterableDataset):
             k=1
         )[0]
 
-        ds_info = self.dataset_dict[self.id2cat[arm_idx]]
-        sample = next(self.dataset_dict[ds_info])
+        sample = next(self.dataset_dict[self.id2cat[arm_idx]])
         self.curr_idx[arm_idx] += 1
         self.produced += 1
         return sample[0]
