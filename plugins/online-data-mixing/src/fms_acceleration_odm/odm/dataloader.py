@@ -1,5 +1,6 @@
 # dataloader + RL agent
-from datasets import IterableDataset, DatasetDict
+from datasets import DatasetDict
+from torch.utils.data import IterableDataset
 from typing import Optional, List
 import math
 import numpy as np
