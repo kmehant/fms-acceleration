@@ -65,7 +65,6 @@ class OnlineData(IterableDataset):
         sample = next(self.dataset_dict[self.id2cat[arm_idx]])
         self.curr_idx[arm_idx] += 1
         self.produced += 1
-        logger.info(f"sample: {sample}")
         sample = {
             "input_ids": sample["input_ids"][0],
             "attention_mask": sample["attention_mask"][0],
