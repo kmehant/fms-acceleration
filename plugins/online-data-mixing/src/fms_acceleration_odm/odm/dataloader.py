@@ -66,6 +66,11 @@ class OnlineData(IterableDataset):
         self.curr_idx[arm_idx] += 1
         self.produced += 1
         logger.info(f"sample: {sample}")
+        sample = {
+            "input_ids": sample["input_ids"][0],
+            "attention_mask": sample["attention_mask"][0],
+            "labels": sample["labels"][0]
+        }
         return sample
 
     def update_weights(self, batch_categories, rewards):
