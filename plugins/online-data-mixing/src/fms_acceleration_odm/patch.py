@@ -13,8 +13,8 @@ def patch_fms_hf_tuning_data_utils_for_odm():
     # Third Party
     # pylint: disable=import-outside-toplevel
     from fms_acceleration.model_patcher import patch_target_module
-
-    patch_target_module("tuning.data.data_processors.DataPreProcessor._process_dataset_configs", _process_dataset_configs)
+    from tuning.data.data_processors import DataPreProcessor
+    DataPreProcessor._process_dataset_configs = _process_dataset_configs
     patch_target_module("tuning.data.setup_dataprocessor.process_dataargs", process_dataargs)
 
 def _process_dataset_configs(
