@@ -29,8 +29,6 @@ class OnlineData(IterableDataset):
             - gamma: float - MAB variable
             - eta: float - MAB variable
         """
-        super().__init__()
-
         logger.info(f"Using gamma: {gamma} and eta: {eta}")
 
         self.gamma = gamma
