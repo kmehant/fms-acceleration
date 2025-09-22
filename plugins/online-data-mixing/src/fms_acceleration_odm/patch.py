@@ -3,7 +3,7 @@ from datasets import IterableDataset, Dataset, IterableDatasetDict, DatasetDict
 from typing import Union, List
 from logging import getLogger
 from .odm import OnlineData
-from tuning.data.setup_dataprocessor import _process_dataconfig_file, _process_raw_data_args, is_pretokenized_dataset
+from tuning.data.setup_dataprocessor import process_dataconfig_file, _process_raw_data_args, is_pretokenized_dataset
 from tuning.data.data_preprocessing_utils import get_data_collator
 
 logger = getLogger(__name__)
@@ -96,7 +96,7 @@ def process_dataargs(
         )
 
     if data_args.data_config_path:
-        train_dataset, eval_dataset, dataset_text_field = _process_dataconfig_file(
+        train_dataset, eval_dataset, dataset_text_field = process_dataconfig_file(
             data_args,
             train_args,
             tokenizer,
