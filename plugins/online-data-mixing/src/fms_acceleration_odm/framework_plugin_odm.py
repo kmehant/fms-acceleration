@@ -56,7 +56,7 @@ class OnlineDataMixingAccelerationPlugin(AccelerationPlugin):
         self, model: torch.nn.Module = None, accelerator=None
     ):
         callbacks = []
-        patch_fms_hf_tuning_data_utils_for_odm()
+        # patch_fms_hf_tuning_data_utils_for_odm()
         return callbacks
 
 
