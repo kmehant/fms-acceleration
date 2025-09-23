@@ -133,6 +133,8 @@ class OnlineData(IterableDataset):
         rewards = [0] * self.total_categories
         for c in range(self.total_categories):
             for batch in self.eval_dataset_dict[self.id2cat[c]]:
+                import torch
+                torch.distributed.breakpoint()
                 rewards[c] += compute_reward(model=model, batch=batch, vocab_size=32000, reward_type=self.reward_type, train_loop_metrics=metrics)
         self._update_sampling_ratio(new_weights=rewards)
         logger.info(f"sampling weights are updated with the rewards {rewards}")
