@@ -147,7 +147,7 @@ class OnlineData(IterableDataset):
         eval_dataset_dict = {}
         self._reset_eval_dataloaders()
         for c in range(self.total_categories):
-            eval_dataset_dict[self.id2cat[c]] = accelerator.prepare(self.eval_dataset_dict[self.id2cat[c]])
+            eval_dataset_dict[self.id2cat[c]] = accelerator.prepare(self.eval_dataset_dict_dl[self.id2cat[c]])
         for c in range(self.total_categories):
             for batch in eval_dataset_dict[self.id2cat[c]]:
                 rewards[c] += compute_reward(model=model, batch={k: v.to(accelerator.device) for k, v in batch.items()}, vocab_size=32000, reward_type=self.reward_type, train_loop_metrics=metrics)
