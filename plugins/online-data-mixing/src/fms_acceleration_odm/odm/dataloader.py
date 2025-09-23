@@ -55,6 +55,7 @@ class OnlineData(IterableDataset):
         self.category_list = sorted(dataset_dict.keys())
         self.id2cat = {i: c for i, c in enumerate(self.category_list)}
         self.cat2id = {c: i for i, c in enumerate(self.category_list)}
+        print("cat2id", self.cat2id)
         self.total_categories = len(self.category_list)
         logger.info(f"Dataset categories: {self.category_list}")
         if sampling_weights is None:
@@ -135,6 +136,7 @@ class OnlineData(IterableDataset):
     
     def update_sampling_weights(self, model, accelerator, metrics):
         rewards = [0] * self.total_categories
+        print("self.total_categories", self.total_categories)
         if not self.eval_dataloader_prepared:
             for c in range(self.total_categories):
                 self.eval_dataset_dict[self.id2cat[c]] = accelerator.prepare(self.eval_dataset_dict[self.id2cat[c]])
