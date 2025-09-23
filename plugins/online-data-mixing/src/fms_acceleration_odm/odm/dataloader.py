@@ -131,7 +131,7 @@ class OnlineData(IterableDataset):
     
     def update_sampling_weights(self, model, metrics):
         rewards = [0] * self.total_categories
-        for c in range(len(self.total_categories)):
+        for c in range(self.total_categories):
             for batch in self.eval_dataset_dict[self.id2cat[c]]:
                 rewards[c] += compute_reward(model=model, batch=batch, vocab_size=32000, reward_type=self.reward_type, train_loop_metrics=metrics)
         self._update_sampling_ratio(new_weights=rewards)
