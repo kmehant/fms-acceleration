@@ -164,7 +164,7 @@ def _evaluate(self, trial, ignore_keys_for_eval, skip_scheduler=False):
     import torch
     print("self.model.ta_eval_steps", self.model.ta_eval_steps)
     if self.state.global_step % self.model.ta_update_interval == 0:
-        if self.self.is_world_process_zero():
+        if self.is_world_process_zero():
             self.train_dataset.update_sampling_weights(self.model, None)
         else:
             torch.distributed.barrier()
