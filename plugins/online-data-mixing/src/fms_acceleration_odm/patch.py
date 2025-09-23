@@ -5,12 +5,17 @@ from logging import getLogger
 from .odm import OnlineData
 from tuning.data.setup_dataprocessor import process_dataconfig_file, _process_raw_data_args, is_pretokenized_dataset
 from tuning.data.data_preprocessing_utils import get_data_collator
-from types import MethodType
+from transformers import Trainer
 
 logger = getLogger(__name__)
 
-def patch_hf_for_odm(accelerator):
-    accelerator._evaluate = MethodType(_evaluate, accelerator)
+def patch_hf_for_odm():
+    print("patching trainer")
+    # Third Party
+    # pylint: disable=import-outside-toplevel
+    from fms_acceleration.model_patcher import patch_target_module
+    Trainer._evaluate = _evaluate
+    patch_target_module("transformers.trainer.Trainer", Trainer)
 
 
 def patch_fms_hf_tuning_data_utils_for_odm():
@@ -157,12 +162,12 @@ def process_dataargs(
     
 def _evaluate(self, trial, ignore_keys_for_eval, skip_scheduler=False):
     import torch
+    print("self.model.ta_eval_steps", self.model.ta_eval_steps)
     if self.state.global_step % self.model.ta_update_interval == 0:
         if self.self.is_world_process_zero():
             self.train_dataset.update_sampling_weights(self.model, None)
         else:
             torch.distributed.barrier()
-    print("self.model.ta_eval_steps", self.model.ta_eval_steps)
     if self.model.ta_eval_steps and self.state.global_step % self.model.ta_eval_steps == 0:
         metrics = self.evaluate(ignore_keys=ignore_keys_for_eval)
         self._report_to_hp_search(trial, self.state.global_step, metrics)

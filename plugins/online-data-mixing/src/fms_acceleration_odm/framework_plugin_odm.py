@@ -67,7 +67,7 @@ class OnlineDataMixingAccelerationPlugin(AccelerationPlugin):
     ):
         callbacks = []
         # patch_fms_hf_tuning_data_utils_for_odm()
-        patch_hf_for_odm(accelerator=accelerator)
+        patch_hf_for_odm()
         return callbacks
 
 
