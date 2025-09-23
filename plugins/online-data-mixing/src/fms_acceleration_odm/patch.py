@@ -210,10 +210,7 @@ def _evaluate(self, trial, ignore_keys_for_eval, skip_scheduler=False):
         if args.past_index >= 0:
             self._past = None
         # prepare dataloader
-        if self.is_world_process_zero():
-            self.train_dataset.update_sampling_weights(model, self.accelerator, None)
-        else:
-            torch.distributed.barrier()
+        self.train_dataset.update_sampling_weights(model, self.accelerator, None)
     if self.model.ta_eval_steps and self.state.global_step % self.model.ta_eval_steps == 0:
         metrics = self.evaluate(ignore_keys=ignore_keys_for_eval)
         self._report_to_hp_search(trial, self.state.global_step, metrics)
