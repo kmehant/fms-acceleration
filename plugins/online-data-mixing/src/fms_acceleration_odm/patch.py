@@ -162,10 +162,56 @@ def process_dataargs(
     
 def _evaluate(self, trial, ignore_keys_for_eval, skip_scheduler=False):
     import torch
+    import time
     print("self.model.ta_eval_steps", self.model.ta_eval_steps)
     if self.state.global_step % self.model.ta_update_interval == 0:
+        # prepare model
+        # code taken from def evaluation_loop
+        model = self._wrap_model(self.model, training=False)
+        args = self.args
+        if len(self.accelerator._models) == 0 and model is self.model:
+            start_time = time.time()
+            model = (
+                self.accelerator.prepare(model)
+                if self.is_deepspeed_enabled
+                or (self.is_fsdp_enabled and self.accelerator.mixed_precision != "fp8" and not self.args.torch_compile)
+                else self.accelerator.prepare_model(model, evaluation_mode=True)
+            )
+            self.model_preparation_time = round(time.time() - start_time, 4)
+
+            if self.is_fsdp_enabled:
+                self.model = model
+
+            # for the rest of this function `model` is the outside model, whether it was wrapped or not
+            if model is not self.model:
+                self.model_wrapped = model
+
+            # backward compatibility
+            if self.is_deepspeed_enabled:
+                self.deepspeed = self.model_wrapped
+
+        # if full fp16 or bf16 eval is wanted and this ``evaluation`` or ``predict`` isn't called
+        # while ``train`` is running, cast it to the right dtype first and then put on device
+        if not self.is_in_train:
+            if args.fp16_full_eval:
+                model = model.to(dtype=torch.float16, device=args.device)
+            elif args.bf16_full_eval:
+                model = model.to(dtype=torch.bfloat16, device=args.device)
+
+        batch_size = self.args.eval_batch_size
+
+        logger.info(f"  Batch size = {batch_size}")
+
+        if hasattr(model, "eval") and callable(model.eval):
+            model.eval()
+        if hasattr(self.optimizer, "eval") and callable(self.optimizer.eval):
+            self.optimizer.eval()
+        # Do this before wrapping.
+        if args.past_index >= 0:
+            self._past = None
+        # prepare dataloader
         if self.is_world_process_zero():
-            self.train_dataset.update_sampling_weights(self.model, None)
+            self.train_dataset.update_sampling_weights(model, self.accelerator, None)
         else:
             torch.distributed.barrier()
     if self.model.ta_eval_steps and self.state.global_step % self.model.ta_eval_steps == 0:

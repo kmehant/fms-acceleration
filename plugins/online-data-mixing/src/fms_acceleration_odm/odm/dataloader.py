@@ -63,6 +63,7 @@ class OnlineData(IterableDataset):
         self.produced = 0
         self.arm_idx = 0
         self.reward_type = Reward.ENTROPY
+        self.eval_dataloader_prepared = False
 
     def __iter__(self):
         self.produced = 0
@@ -129,8 +130,11 @@ class OnlineData(IterableDataset):
     def get_sampling_ratio(self): 
         return self.sampling_ratio.copy()
     
-    def update_sampling_weights(self, model, metrics):
+    def update_sampling_weights(self, model, accelerator, metrics):
         rewards = [0] * self.total_categories
+        if not self.eval_dataloader_prepared:
+            for c in range(self.total_categories):
+                self.eval_dataset_dict[self.id2cat[c]] = accelerator.prepare(self.eval_dataset_dict[self.id2cat[c]])
         for c in range(self.total_categories):
             for batch in self.eval_dataset_dict[self.id2cat[c]]:
                 import torch
