@@ -141,7 +141,7 @@ class OnlineData(IterableDataset):
                 rewards[c] += compute_reward(model=model, batch={k: v.to(accelerator.device) for k, v in batch.items()}, vocab_size=32000, reward_type=self.reward_type, train_loop_metrics=metrics)
         import torch
         torch.distributed.breakpoint()
-        rewards = torch.tensor(rewards, device=accelerator.device)
+        # rewards = torch.tensor(rewards, device=accelerator.device)
         rewards = accelerator.reduce(rewards, reduction="sum").tolist()
         if accelerator.is_main_process:
             self._update_sampling_ratio(new_weights=rewards)
