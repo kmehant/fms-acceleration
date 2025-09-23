@@ -123,6 +123,16 @@ class OnlineData(IterableDataset):
             # this can be improved with persistent workers and caching dataloaders and resetting them when needed.
             self.eval_dataset_dict_dl[k] = iter(DataLoader(self.eval_dataset_dict[k], self.eval_batch_size, shuffle=False, num_workers=1, collate_fn=self.eval_collators_dict[k]))
 
+    def _update_sampling_ratio(self, weights):
+        w = weights
+        w_sum = w.sum()
+        K = len(w)
+
+        base = (1.0 - self.gamma) * (w / w_sum)
+        expl = self.gamma / K
+        self.sampling_ratio = (base + expl).tolist()
+        return self.sampling_ratio
+
     def update_weights(self, count, rewards):
         """
         batch_categories  : list of categories of the samples in the batch
@@ -133,16 +143,7 @@ class OnlineData(IterableDataset):
             avg_r = rewards[arm] / count[arm]     # empirical reward
             est_r = avg_r / self.sampling_ratio[arm]
             self.sampling_weights[arm] *= math.exp(self.eta * est_r / self.K)
-
-        w = self.sampling_weights
-        w_sum = w.sum()
-        K = len(w)
-
-        base = (1.0 - self.gamma) * (w / w_sum)
-        expl = self.gamma / K
-        self.sampling_ratio = (base + expl).tolist()
-
-        return self.sampling_ratio
+        return self._update_sampling_ratio(self.sampling_weights)
 
     def get_weights(self):
         return self.sampling_weights.copy()
