@@ -75,7 +75,7 @@ class OnlineData(IterableDataset):
         self.K = self.total_categories
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
-        self.log_file_path = self.output_dir / "odm.jsonl"
+        self.log_file_path = os.path.join(self.output_dir, "odm.jsonl")
         self.log = {"samples_produced_so_far": 0, 
                     "sampling_interval": self.sampling_interval,
                     "total_categories": self.total_categories, 
