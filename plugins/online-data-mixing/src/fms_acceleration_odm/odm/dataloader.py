@@ -137,11 +137,12 @@ class OnlineData(IterableDataset):
     def update_sampling_weights(self, model, accelerator, metrics):
         rewards = [0] * self.total_categories
         print("self.total_categories", self.total_categories)
-        if not self.eval_dataloader_prepared:
-            for c in range(self.total_categories):
-                self.eval_dataset_dict[self.id2cat[c]] = accelerator.prepare(self.eval_dataset_dict[self.id2cat[c]])
+        eval_dataset_dict = {}
+        # if not self.eval_dataloader_prepared:
         for c in range(self.total_categories):
-            for batch in self.eval_dataset_dict[self.id2cat[c]]:
+            eval_dataset_dict[self.id2cat[c]] = accelerator.prepare(self.eval_dataset_dict[self.id2cat[c]])
+        for c in range(self.total_categories):
+            for batch in eval_dataset_dict[self.id2cat[c]]:
                 rewards[c] += compute_reward(model=model, batch={k: v.to(accelerator.device) for k, v in batch.items()}, vocab_size=32000, reward_type=self.reward_type, train_loop_metrics=metrics)
         import torch
         torch.distributed.breakpoint()
