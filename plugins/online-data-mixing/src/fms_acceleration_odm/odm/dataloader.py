@@ -45,10 +45,11 @@ class OnlineData(IterableDataset):
         self.sampling_interval = sampling_interval
         self.collators_dict = collators_dict
         self.eval_collators_dict = eval_collators_dict
+        self.eval_dataset_dict = eval_dataset_dict
+        self.eval_dataset_dict_dl = {}
         for k, _ in dataset_dict.items():
             dataset_dict[k] = iter(DataLoader(dataset_dict[k], 1, shuffle=False, num_workers=1, collate_fn=collators_dict[k]))
-        for k, _ in eval_dataset_dict.items():
-            eval_dataset_dict[k] = iter(DataLoader(eval_dataset_dict[k], eval_batch_size, shuffle=False, num_workers=1, collate_fn=eval_collators_dict[k]))
+        self.eval_batch_size = eval_batch_size
         self.dataset_dict = dataset_dict
         self.eval_dataset_dict = eval_dataset_dict
         logger.info(f"eval_dataset_dict {eval_dataset_dict}")
@@ -91,6 +92,12 @@ class OnlineData(IterableDataset):
             "labels": sample["labels"][0]
         }
         return sample
+
+    def _reset_eval_dataloaders(self):
+        self.eval_dataset_dict_dl = {}
+        for k, _ in self.eval_dataset_dict.items():
+            # this can be improved with persistent workers and caching dataloaders and resetting them when needed.
+            self.eval_dataset_dict_dl[k] = iter(DataLoader(self.eval_dataset_dict[k], self.eval_batch_size, shuffle=False, num_workers=1, collate_fn=self.eval_collators_dict[k]))
 
     def update_weights(self, batch_categories, rewards):
         """
@@ -138,9 +145,9 @@ class OnlineData(IterableDataset):
         rewards = [0] * self.total_categories
         print("self.total_categories", self.total_categories)
         eval_dataset_dict = {}
-        # if not self.eval_dataloader_prepared:
+        self._reset_eval_dataloaders()
         for c in range(self.total_categories):
-            eval_dataset_dict[self.id2cat[c]] = iter(accelerator.prepare(self.eval_dataset_dict[self.id2cat[c]]))
+            eval_dataset_dict[self.id2cat[c]] = accelerator.prepare(self.eval_dataset_dict[self.id2cat[c]])
         for c in range(self.total_categories):
             for batch in eval_dataset_dict[self.id2cat[c]]:
                 rewards[c] += compute_reward(model=model, batch={k: v.to(accelerator.device) for k, v in batch.items()}, vocab_size=32000, reward_type=self.reward_type, train_loop_metrics=metrics)
