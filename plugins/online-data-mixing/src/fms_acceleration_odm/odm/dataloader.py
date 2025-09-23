@@ -8,7 +8,10 @@ import random
 from logging import getLogger
 from torch.utils.data import DataLoader
 from .reward import compute_reward, Reward
+import torch
+
 logger = getLogger(__name__)
+
 
 class OnlineData(IterableDataset):
     def __init__(
@@ -57,7 +60,7 @@ class OnlineData(IterableDataset):
         if sampling_weights is None:
             sampling_weights = [1]*self.total_categories
 
-        self.sampling_weights = np.array(sampling_weights, dtype=np.float64)
+        self.sampling_weights = torch.tensor(sampling_weights, dtype=np.float64)
         self.sampling_ratio = []
         self._update_sampling_ratio(self.sampling_weights)
         self.curr_idx = [0] * self.total_categories
@@ -111,7 +114,6 @@ class OnlineData(IterableDataset):
         return self.sampling_weights
 
     def _update_sampling_ratio(self, new_weights):
-        new_weights = np.asarray(new_weights, dtype=np.float64)
         assert new_weights.shape == self.sampling_weights.shape
         self.sampling_weights[:] = new_weights
 
@@ -144,5 +146,5 @@ class OnlineData(IterableDataset):
         # rewards = torch.tensor(rewards, device=accelerator.device)
         rewards = accelerator.reduce(rewards, reduction="sum")
         if accelerator.is_main_process:
+            logger.info(f"new rewards {rewards}")
             self._update_sampling_ratio(new_weights=rewards)
-            logger.info(f"sampling weights are updated with the rewards {rewards}")
