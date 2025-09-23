@@ -142,7 +142,7 @@ class OnlineData(IterableDataset):
         import torch
         torch.distributed.breakpoint()
         # rewards = torch.tensor(rewards, device=accelerator.device)
-        rewards = accelerator.reduce(rewards, reduction="sum").tolist()
+        rewards = accelerator.reduce(rewards, reduction="sum")
         if accelerator.is_main_process:
             self._update_sampling_ratio(new_weights=rewards)
             logger.info(f"sampling weights are updated with the rewards {rewards}")
