@@ -84,7 +84,8 @@ class OnlineData(IterableDataset):
                     "arm_dix": self.arm_idx,
                     "category_level_counts_so_far": self.curr_idx,
                     "rewards": [0]*self.total_categories,
-                    "count": 0
+                    "count": 0,
+                    "action": "",
                     }
 
     def log_to_file(self):
@@ -114,6 +115,7 @@ class OnlineData(IterableDataset):
         self.log["arm_dix"] = self.arm_idx
         self.log["samples_produced_so_far"] = self.produced
         self.log["category_level_counts_so_far"] = self.curr_idx
+        self.log["action"] = "sample"
         self.log_to_file()
         return sample
 
@@ -178,4 +180,5 @@ class OnlineData(IterableDataset):
         self.log["current_sampling_ratio"] = self.sampling_ratio
         self.log["rewards"] = rewards.tolist()
         self.log["count"] = count.tolist()
+        self.log["action"] = "update"
         self.log_to_file()
