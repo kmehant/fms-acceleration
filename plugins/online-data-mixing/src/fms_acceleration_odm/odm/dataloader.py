@@ -51,6 +51,7 @@ class OnlineData(IterableDataset):
         logger.info(f"eval_dataset_dict {eval_dataset_dict}")
         self.category_list = sorted(dataset_dict.keys())
         self.id2cat = {i: c for i, c in enumerate(self.category_list)}
+        self.cat2id = {c: i for i, c in enumerate(self.category_list)}
         self.total_categories = len(self.category_list)
         logger.info(f"Dataset categories: {self.category_list}")
         if sampling_weights is None:
@@ -139,6 +140,7 @@ class OnlineData(IterableDataset):
             for batch in self.eval_dataset_dict[self.id2cat[c]]:
                 rewards[c] += compute_reward(model=model, batch={k: v.to(accelerator.device) for k, v in batch.items()}, vocab_size=32000, reward_type=self.reward_type, train_loop_metrics=metrics)
         import torch
+        torch.distributed.breakpoint()
         rewards = torch.tensor(rewards, device=accelerator.device)
         rewards = accelerator.reduce(rewards, reduction="sum").tolist()
         if accelerator.is_main_process:
