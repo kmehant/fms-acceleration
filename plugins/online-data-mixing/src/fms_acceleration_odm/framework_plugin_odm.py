@@ -22,7 +22,7 @@ from transformers import TrainingArguments
 import torch
 
 # Local
-from .patch import patch_fms_hf_tuning_data_utils_for_odm
+from .patch import patch_hf_for_odm
 
 
 # pylint: disable=too-many-instance-attributes
@@ -32,8 +32,12 @@ class OnlineDataMixingAccelerationPlugin(AccelerationPlugin):
     def __init__(self, configurations: Dict[str, Dict]):
         super().__init__(configurations)
 
-        self._ac_level = self._check_config_and_maybe_check_values(
-            key="training.odm.odm.level",
+        self._update_interval = self._check_config_and_maybe_check_values(
+            key="training.odm.odm.update_interval",
+            default=1,
+        )
+        self._sample_interval = self._check_config_and_maybe_check_values(
+            key="training.odm.odm.sample_interval",
             default=1,
         )
     # data_config file should be there
@@ -50,6 +54,11 @@ class OnlineDataMixingAccelerationPlugin(AccelerationPlugin):
         train_args.odm_sampling_weights = None
         train_args.odm_gamma = 1
         train_args.odm_eta = 0.1
+        model.ta_eval_steps = train_args.eval_steps
+        model.ta_update_interval = self._update_interval
+        model.ta_sample_interval = self._sample_interval
+        train_args.eval_steps = 1
+        train_args.eval_strategy = "steps"
         return model, modifiable_args
 
     def get_callbacks_and_ready_for_train(
@@ -57,6 +66,7 @@ class OnlineDataMixingAccelerationPlugin(AccelerationPlugin):
     ):
         callbacks = []
         # patch_fms_hf_tuning_data_utils_for_odm()
+        patch_hf_for_odm(accelerator=accelerator)
         return callbacks
 
 

@@ -7,6 +7,7 @@ import numpy as np
 import random
 from logging import getLogger
 from torch.utils.data import DataLoader
+from .reward import compute_reward, Reward
 logger = getLogger(__name__)
 
 class OnlineData(IterableDataset):
@@ -14,9 +15,13 @@ class OnlineData(IterableDataset):
             self,
             dataset_dict: DatasetDict,
             collators_dict: dict,
+            eval_dataset_dict: DatasetDict,
+            eval_collators_dict: dict,
             sampling_weights: Optional[List[float]]=None,
             gamma: float = 0.1,
             eta: float = 0.3,
+            sampling_interval: int = 1, # sample data category every 1 sample,
+            eval_batch_size: int = 5
         ):
         """
         Mixes datasets with sampling ratios learnt using Multi Armed Bandit (MAB) and rewards defined.
@@ -34,10 +39,15 @@ class OnlineData(IterableDataset):
 
         self.gamma = gamma
         self.eta = eta
+        self.sampling_interval = sampling_interval
         self.collators_dict = collators_dict
+        self.eval_collators_dict = eval_collators_dict
         for k, _ in dataset_dict.items():
             dataset_dict[k] = iter(DataLoader(dataset_dict[k], 1, shuffle=False, num_workers=1, collate_fn=collators_dict[k]))
+        for k, _ in eval_dataset_dict.items():
+            eval_dataset_dict[k] = iter(DataLoader(eval_dataset_dict[k], eval_batch_size, shuffle=False, num_workers=1, collate_fn=eval_collators_dict[k]))
         self.dataset_dict = dataset_dict
+        self.eval_dataset_dict = eval_dataset_dict
         self.category_list = sorted(dataset_dict.keys())
         self.id2cat = {i: c for i, c in enumerate(self.category_list)}
         self.total_categories = len(self.category_list)
@@ -50,20 +60,23 @@ class OnlineData(IterableDataset):
         self.update_sampling_ratio(self.sampling_weights)
         self.curr_idx = [0] * self.total_categories
         self.produced = 0
+        self.arm_idx = 0
+        self.reward_type = Reward.ENTROPY
 
     def __iter__(self):
         self.produced = 0
         return self
 
     def __next__(self):
-        arm_idx = random.choices(
-            range(self.total_categories),
-            weights=self.sampling_ratio,
-            k=1
-        )[0]
+        if self.produced % self.sampling_interval == 0:            
+            self.arm_idx = random.choices(
+                range(self.total_categories),
+                weights=self.sampling_ratio,
+                k=1
+            )[0]
 
-        sample = next(self.dataset_dict[self.id2cat[arm_idx]])
-        self.curr_idx[arm_idx] += 1
+        sample = next(self.dataset_dict[self.id2cat[self.arm_idx]])
+        self.curr_idx[self.arm_idx] += 1
         self.produced += 1
         sample = {
             "input_ids": sample["input_ids"][0],
@@ -94,7 +107,7 @@ class OnlineData(IterableDataset):
 
         return self.sampling_weights
 
-    def update_sampling_ratio(self, new_weights):
+    def _update_sampling_ratio(self, new_weights):
         new_weights = np.asarray(new_weights, dtype=np.float64)
         assert new_weights.shape == self.sampling_weights.shape
         self.sampling_weights[:] = new_weights
@@ -114,3 +127,11 @@ class OnlineData(IterableDataset):
 
     def get_sampling_ratio(self): 
         return self.sampling_ratio.copy()
+    
+    def update_sampling_weights(self, model, metrics):
+        rewards = [0] * self.total_categories
+        for c in range(len(self.total_categories)):
+            for batch in self.eval_dataset_dict[self.id2cat[c]]:
+                rewards[c] += compute_reward(model=model, batch=batch, vocab_size=32000, reward_type=self.reward_type, train_loop_metrics=metrics)
+        self._update_sampling_ratio(new_weights=rewards)
+        logger.info(f"sampling weights are updated with the rewards {rewards}")

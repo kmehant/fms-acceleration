@@ -8,6 +8,8 @@ from tuning.data.data_preprocessing_utils import get_data_collator
 
 logger = getLogger(__name__)
 
+def patch_hf_for_odm(accelerator):
+    accelerator._evaluate = _evaluate
 
 def patch_fms_hf_tuning_data_utils_for_odm():
     # Third Party
@@ -115,7 +117,7 @@ def process_dataargs(
             processor,
         )
     collators = {}
-    for k, v in train_dataset:
+    for k, v in train_dataset.items():
         is_tokenized_dataset = is_pretokenized_dataset(v)
         data_collator = get_data_collator(
             train_args.packing,
@@ -150,3 +152,31 @@ def process_dataargs(
         max_seq_length,
         dataset_kwargs,
     )
+    
+def _evaluate(self, trial, ignore_keys_for_eval, skip_scheduler=False):
+    import torch
+    if self.state.global_step % self.model.ta_update_interval == 0:
+        if self.self.is_world_process_zero():
+            self.train_dataset.update_sampling_weights(self.model, None)
+        else:
+            torch.distributed.barrier()
+    if self.state.global_step % self.model.ta_eval_steps == 0: 
+        metrics = self.evaluate(ignore_keys=ignore_keys_for_eval)
+        self._report_to_hp_search(trial, self.state.global_step, metrics)
+
+        # Run delayed LR scheduler now that metrics are populated
+        if isinstance(self.lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau) and not skip_scheduler:
+            metric_to_check = self.args.metric_for_best_model
+            if not metric_to_check.startswith("eval_"):
+                metric_to_check = f"eval_{metric_to_check}"
+            try:
+                self.lr_scheduler.step(metrics[metric_to_check])
+            except KeyError as exc:
+                raise KeyError(
+                    f"The `metric_for_best_model` training argument is set to '{metric_to_check}', "
+                    f"which is not found in the evaluation metrics. "
+                    f"The available evaluation metrics are: {list(metrics.keys())}. "
+                    f"Please ensure that the `compute_metrics` function returns a dictionary that includes '{metric_to_check}' or "
+                    f"consider changing the `metric_for_best_model` via the TrainingArguments."
+                ) from exc
+        return metrics
