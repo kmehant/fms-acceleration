@@ -5,11 +5,13 @@ from logging import getLogger
 from .odm import OnlineData
 from tuning.data.setup_dataprocessor import process_dataconfig_file, _process_raw_data_args, is_pretokenized_dataset
 from tuning.data.data_preprocessing_utils import get_data_collator
+from types import MethodType
 
 logger = getLogger(__name__)
 
 def patch_hf_for_odm(accelerator):
-    accelerator._evaluate = _evaluate
+    accelerator._evaluate = MethodType(_evaluate, accelerator)
+
 
 def patch_fms_hf_tuning_data_utils_for_odm():
     # Third Party
