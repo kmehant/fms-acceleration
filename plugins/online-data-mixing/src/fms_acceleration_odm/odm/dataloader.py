@@ -60,7 +60,7 @@ class OnlineData(IterableDataset):
         if sampling_weights is None:
             sampling_weights = [1]*self.total_categories
 
-        self.sampling_weights = torch.tensor(sampling_weights, dtype=np.float64)
+        self.sampling_weights = torch.tensor(sampling_weights, dtype=torch.float64)
         self.sampling_ratio = []
         self._update_sampling_ratio(self.sampling_weights)
         self.curr_idx = [0] * self.total_categories
