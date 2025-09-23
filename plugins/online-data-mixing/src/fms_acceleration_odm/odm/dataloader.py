@@ -151,8 +151,6 @@ class OnlineData(IterableDataset):
         for c in range(self.total_categories):
             for batch in eval_dataset_dict[self.id2cat[c]]:
                 rewards[c] += compute_reward(model=model, batch={k: v.to(accelerator.device) for k, v in batch.items()}, vocab_size=32000, reward_type=self.reward_type, train_loop_metrics=metrics)
-        import torch
-        torch.distributed.breakpoint()
         rewards = torch.tensor(rewards, device=accelerator.device)
         print("individual rewards", rewards)
         rewards = accelerator.reduce(rewards, reduction="sum")
