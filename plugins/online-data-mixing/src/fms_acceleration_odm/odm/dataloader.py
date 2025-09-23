@@ -48,6 +48,7 @@ class OnlineData(IterableDataset):
             eval_dataset_dict[k] = iter(DataLoader(eval_dataset_dict[k], eval_batch_size, shuffle=False, num_workers=1, collate_fn=eval_collators_dict[k]))
         self.dataset_dict = dataset_dict
         self.eval_dataset_dict = eval_dataset_dict
+        logger.info(f"eval_dataset_dict {eval_dataset_dict}")
         self.category_list = sorted(dataset_dict.keys())
         self.id2cat = {i: c for i, c in enumerate(self.category_list)}
         self.total_categories = len(self.category_list)
@@ -57,7 +58,7 @@ class OnlineData(IterableDataset):
 
         self.sampling_weights = np.array(sampling_weights, dtype=np.float64)
         self.sampling_ratio = []
-        self.update_sampling_ratio(self.sampling_weights)
+        self._update_sampling_ratio(self.sampling_weights)
         self.curr_idx = [0] * self.total_categories
         self.produced = 0
         self.arm_idx = 0
