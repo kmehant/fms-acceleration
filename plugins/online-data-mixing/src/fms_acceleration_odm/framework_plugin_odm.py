@@ -51,6 +51,7 @@ class OnlineDataMixingAccelerationPlugin(AccelerationPlugin):
         train_args: TrainingArguments,
         modifiable_args: Tuple[LoraConfig],
     ):
+        print("augmentation step")
         train_args.odm_sampling_weights = None
         train_args.odm_gamma = 1
         train_args.odm_eta = 0.1
