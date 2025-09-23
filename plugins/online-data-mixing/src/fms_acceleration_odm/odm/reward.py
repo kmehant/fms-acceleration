@@ -72,11 +72,11 @@ def compute_reward(
         varentropy = (varentropy / max_entropy**2).clamp(0.0, 1.0)
         entropy_last_token = (entropy_last_token / max_entropy).clamp(0.0, 1.0)
         if reward_type == Reward.ENTROPY:
-            return entropy.sum().item()
+            return entropy.shape[0], entropy.sum().item()
         elif reward_type == Reward.ENTROPY3_VARENT1:
-            return 0.75 * entropy.sum().item() + 0.25 * varentropy.sum().item()
+            return entropy.shape[0], 0.75 * entropy.sum().item() + 0.25 * varentropy.sum().item()
         elif reward_type == Reward.ENTROPY_LAST_TOKEN:
-            return entropy_last_token.sum().item()
+            return entropy.shape[0], entropy_last_token.sum().item()
     elif reward_type == Reward.TRAIN_LOSS:
         pass
     elif reward_type == Reward.VALIDATION_LOSS:

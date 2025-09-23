@@ -3,12 +3,13 @@ from datasets import DatasetDict
 from torch.utils.data import IterableDataset
 from typing import Optional, List
 import math
-import numpy as np
 import random
 from logging import getLogger
 from torch.utils.data import DataLoader
 from .reward import compute_reward, Reward
 import torch
+import os
+import json
 
 logger = getLogger(__name__)
 
@@ -24,7 +25,8 @@ class OnlineData(IterableDataset):
             gamma: float = 0.1,
             eta: float = 0.3,
             sampling_interval: int = 1, # sample data category every 1 sample,
-            eval_batch_size: int = 5
+            eval_batch_size: int = 5,
+            output_dir="odm"
         ):
         """
         Mixes datasets with sampling ratios learnt using Multi Armed Bandit (MAB) and rewards defined.
@@ -69,7 +71,25 @@ class OnlineData(IterableDataset):
         self.produced = 0
         self.arm_idx = 0
         self.reward_type = Reward.ENTROPY
-        self.eval_dataloader_prepared = False
+        self.output_dir = output_dir
+        self.K = self.total_categories
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
+        self.log_file_path = self.output_dir / "odm.jsonl"
+        self.log = {"samples_produced_so_far": 0, 
+                    "sampling_interval": self.sampling_interval,
+                    "total_categories": self.total_categories, 
+                    "current_sampling_weights": self.sampling_weights.tolist(), 
+                    "current_sampling_ratio": self.sampling_ratio,
+                    "arm_dix": self.arm_idx,
+                    "category_level_counts_so_far": self.curr_idx,
+                    "rewards": [0]*self.total_categories,
+                    "count": 0
+                    }
+
+    def log_to_file(self):
+        with open(self.log_file_path, "a") as f:
+            f.write(json.dumps(self.log) + "\n")
 
     def __iter__(self):
         self.produced = 0
@@ -91,6 +111,10 @@ class OnlineData(IterableDataset):
             "attention_mask": sample["attention_mask"][0],
             "labels": sample["labels"][0]
         }
+        self.log["arm_dix"] = self.arm_idx
+        self.log["samples_produced_so_far"] = self.produced
+        self.log["category_level_counts_so_far"] = self.curr_idx
+        self.log_to_file()
         return sample
 
     def _reset_eval_dataloaders(self):
@@ -99,31 +123,16 @@ class OnlineData(IterableDataset):
             # this can be improved with persistent workers and caching dataloaders and resetting them when needed.
             self.eval_dataset_dict_dl[k] = iter(DataLoader(self.eval_dataset_dict[k], self.eval_batch_size, shuffle=False, num_workers=1, collate_fn=self.eval_collators_dict[k]))
 
-    def update_weights(self, batch_categories, rewards):
+    def update_weights(self, count, rewards):
         """
         batch_categories  : list of categories of the samples in the batch
         rewards: list[float] (same length) -- reward in [0,1]
         """
-        cat_sum, cat_cnt = {}, {}
-
-        for c, r in zip(batch_categories, rewards):
-            cat_sum[c] = cat_sum.get(c, 0.0) + float(r)
-            cat_cnt[c] = cat_cnt.get(c, 0) + 1
 
         for arm in range(self.K):
-            if arm in cat_sum:                          # arm was sampled
-                avg_r = cat_sum[arm] / cat_cnt[arm]     # empirical reward
-                est_r = avg_r / self.sampling_ratio[arm]
-            else:                                       # arm not sampled
-                est_r = 0.0
-
+            avg_r = rewards[arm] / count[arm]     # empirical reward
+            est_r = avg_r / self.sampling_ratio[arm]
             self.sampling_weights[arm] *= math.exp(self.eta * est_r / self.K)
-
-        return self.sampling_weights
-
-    def _update_sampling_ratio(self, new_weights):
-        assert new_weights.shape == self.sampling_weights.shape
-        self.sampling_weights[:] = new_weights
 
         w = self.sampling_weights
         w_sum = w.sum()
@@ -143,6 +152,7 @@ class OnlineData(IterableDataset):
     
     def update_sampling_weights(self, model, accelerator, metrics):
         rewards = [0] * self.total_categories
+        count = [0] * self.total_categories
         print("self.total_categories", self.total_categories)
         eval_dataset_dict = {}
         self._reset_eval_dataloaders()
@@ -150,10 +160,21 @@ class OnlineData(IterableDataset):
             eval_dataset_dict[self.id2cat[c]] = accelerator.prepare(self.eval_dataset_dict_dl[self.id2cat[c]])
         for c in range(self.total_categories):
             for batch in eval_dataset_dict[self.id2cat[c]]:
-                rewards[c] += compute_reward(model=model, batch={k: v.to(accelerator.device) for k, v in batch.items()}, vocab_size=32000, reward_type=self.reward_type, train_loop_metrics=metrics)
+                cc, rc = compute_reward(model=model, batch={k: v.to(accelerator.device) for k, v in batch.items()}, vocab_size=32000, reward_type=self.reward_type, train_loop_metrics=metrics)
+                rewards[c] += rc
+                count[c] += cc
         rewards = torch.tensor(rewards, device=accelerator.device)
+        count = torch.tensor(count, device=accelerator.device)
         print("individual rewards", rewards)
+        print("individual reward counts", count)
         rewards = accelerator.reduce(rewards, reduction="sum")
+        count = accelerator.reduce(count, reduction="sum")
         if accelerator.is_main_process:
             logger.info(f"new rewards {rewards}")
-            self._update_sampling_ratio(new_weights=rewards)
+            logger.info(f"new counts {count}")
+            self.update_weights(rewards, count)
+        self.log["current_sampling_weights"] = self.sampling_weights.tolist()
+        self.log["current_sampling_ratio"] = self.sampling_ratio
+        self.log["rewards"] = rewards.tolist()
+        self.log["count"] = count.tolist()
+        self.log_to_file()
