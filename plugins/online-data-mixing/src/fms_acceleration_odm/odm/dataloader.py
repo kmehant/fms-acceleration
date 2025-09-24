@@ -54,13 +54,10 @@ class OnlineData(IterableDataset):
         self.eval_batch_size = eval_batch_size
         self.dataset_dict = dataset_dict
         self.eval_dataset_dict = eval_dataset_dict
-        logger.info(f"eval_dataset_dict {eval_dataset_dict}")
         self.category_list = sorted(dataset_dict.keys())
         self.id2cat = {i: c for i, c in enumerate(self.category_list)}
         self.cat2id = {c: i for i, c in enumerate(self.category_list)}
-        print("cat2id", self.cat2id)
         self.total_categories = len(self.category_list)
-        logger.info(f"Dataset categories: {self.category_list}")
         if sampling_weights is None:
             sampling_weights = [1]*self.total_categories
 
@@ -156,7 +153,6 @@ class OnlineData(IterableDataset):
     def update_sampling_weights(self, model, accelerator, metrics):
         rewards = [0] * self.total_categories
         count = [0] * self.total_categories
-        print("self.total_categories", self.total_categories)
         eval_dataset_dict = {}
         self._reset_eval_dataloaders()
         for c in range(self.total_categories):
@@ -168,8 +164,6 @@ class OnlineData(IterableDataset):
                 count[c] += cc
         rewards = torch.tensor(rewards, device=accelerator.device)
         count = torch.tensor(count, device=accelerator.device)
-        print("individual rewards", rewards)
-        print("individual reward counts", count)
         rewards = accelerator.reduce(rewards, reduction="sum")
         count = accelerator.reduce(count, reduction="sum")
         if accelerator.is_main_process:

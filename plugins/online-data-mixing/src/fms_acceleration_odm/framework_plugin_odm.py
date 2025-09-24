@@ -51,15 +51,17 @@ class OnlineDataMixingAccelerationPlugin(AccelerationPlugin):
         train_args: TrainingArguments,
         modifiable_args: Tuple[LoraConfig],
     ):
-        print("augmentation step")
-        train_args.odm_sampling_weights = None
-        train_args.odm_gamma = 1
-        train_args.odm_eta = 0.1
+        # original user intended eval steps is preserved in the model object
+        # while we overwrite the training args eval_steps and strategy to 1 and steps
+        # since that way eval pipeline is always triggered and is patched for controlled
+        # usage for ODM dataloader update action
         model.ta_eval_steps = train_args.eval_steps
-        model.ta_update_interval = self._update_interval
-        model.ta_sample_interval = self._sample_interval
         train_args.eval_steps = 1
         train_args.eval_strategy = "steps"
+
+        # update_interval information has to be made available in the evaluate HF patch 
+        # function and this seems to be the only reasonable way to do so
+        model.ta_update_interval = self._update_interval
         return model, modifiable_args
 
     def get_callbacks_and_ready_for_train(
