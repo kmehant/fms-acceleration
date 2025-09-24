@@ -9,6 +9,7 @@ import random
 # Third Party
 from datasets import DatasetDict
 from torch.utils.data import DataLoader, IterableDataset
+from tqdm import tqdm
 import torch
 
 # Local
@@ -278,7 +279,7 @@ class OnlineData(IterableDataset):
         eval_dataset_dict = {}
         device = accelerator.device if accelerator else torch.device(0)
         self._reset_eval_dataloaders()
-        for c in range(self.total_categories):
+        for c in tqdm(range(self.total_categories), total=self.total_categories):
             # accelerator takes care of preparing the eval dataloaders for distributed inference.
             if accelerator:
                 eval_dataset_dict[self.id2cat[c]] = accelerator.prepare(
@@ -288,8 +289,8 @@ class OnlineData(IterableDataset):
                 eval_dataset_dict[self.id2cat[c]] = self.eval_dataset_dict_dl[
                     self.id2cat[c]
                 ]
-        for c in range(self.total_categories):
-            for batch in eval_dataset_dict[self.id2cat[c]]:
+        for c in tqdm(range(self.total_categories), total=self.total_categories):
+            for batch in tqdm(eval_dataset_dict[self.id2cat[c]]):
                 rc = compute_reward(
                     model=model,
                     batch={k: v.to(device) for k, v in batch.items()},
