@@ -26,13 +26,12 @@ def _evaluate(self, trial, ignore_keys_for_eval, skip_scheduler=False):
     # Third Party
     # pylint: disable=import-outside-toplevel
     import torch
-    print("self.state.log_history before", self.state.log_history)
+
     metrics = None
     if (
         self.model.ta_eval_steps
         and self.state.global_step % self.model.ta_eval_steps == 0
     ):
-        print("self.state.log_history before", self.state.log_history)
         metrics = self.evaluate(ignore_keys=ignore_keys_for_eval)
         self._report_to_hp_search(trial, self.state.global_step, metrics)
 
@@ -56,7 +55,6 @@ def _evaluate(self, trial, ignore_keys_for_eval, skip_scheduler=False):
                     f"dictionary that includes '{metric_to_check}' or "
                     f"consider changing the `metric_for_best_model` via the TrainingArguments."
                 ) from exc
-        print("self.state.log_history", self.state.log_history)
 
     if self.state.global_step % self.model.ta_update_interval == 0:
         logger.info("ODM dataloader RL agent weight update step")
@@ -106,6 +104,6 @@ def _evaluate(self, trial, ignore_keys_for_eval, skip_scheduler=False):
         if args.past_index >= 0:
             self._past = None
         # prepare dataloader
-        self.train_dataset.update_sampling_weights(model, self.accelerator, None)
+        self.train_dataset.update_sampling_weights(model, self.accelerator, self.state)
 
     return metrics

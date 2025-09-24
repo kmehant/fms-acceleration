@@ -16,6 +16,14 @@ class Reward(StrEnum):
     ENTROPY_LAST_TOKEN = auto()
     TRAIN_LOSS = auto()
     VALIDATION_LOSS = auto()
+    GRADNORM = auto()
+
+
+TRAIN_LOSS = {"buffer": None}
+
+EVAL_LOSS = {"buffer": None}
+
+GRADNORM = {"buffer": None}
 
 
 def compute_reward(
@@ -23,7 +31,12 @@ def compute_reward(
     batch: Dict[str, torch.Tensor],
     vocab_size: int,
     reward_type: Reward,
-    train_loop_metrics=None,
+    train_loss_history=None,
+    eval_loss_history=None,
+    gradnorm_history=None,
+    last_sampled_category=None,
+    total_categories=None,
+    current_category=None,
 ) -> float:
     """
     Compute rewards based on the provided reward_type.
@@ -38,15 +51,21 @@ def compute_reward(
             2. The metrics are averaged per sequence after applying the attention mask
 
         Train loss reward: TRAIN_LOSS
+        Categories giving higher train loss reward are chosen.
         Validation loss reward: VALIDATION_LOSS
+        Grad norm reward: GRADNORM
 
     Args:
         model (PreTrainedModel): HF Model object
         batch (torch.Tensor): Batch of samples (input_ids, labels, attention_mask)
         vocab_size (int): Maximum vocab size of the model used by ENTROPY rewards
         reward_type (Reward): Type of the reward
-        train_loop_metrics: Metrics from the training loop such as training loss,
-        grad norm etc.
+        train_loss_history: list of dicts each holding information on the training loss
+        eval_loss_history: list of dicts each holding information on the eval loss
+        gradnorm_history: list of dicts each holding information on the grad_norm
+        last_sampled_category: index of the last sampled category
+        total_categories: total number of categories
+        current_category: currently being reward computed category
     Returns:
         float
     """
@@ -82,8 +101,21 @@ def compute_reward(
             return (0.75 * entropy.sum().item() + 0.25 * varentropy.sum().item(),)
         if reward_type == Reward.ENTROPY_LAST_TOKEN:
             return entropy_last_token.sum().item()
-    elif reward_type == Reward.TRAIN_LOSS:
-        return 0
-    elif reward_type == Reward.VALIDATION_LOSS:
-        return 0
+    if reward_type == Reward.TRAIN_LOSS:
+        if not TRAIN_LOSS["buffer"]:
+            TRAIN_LOSS["buffer"] = [1e-100] * total_categories
+        TRAIN_LOSS[last_sampled_category] = train_loss_history[-1]["loss"]
+        return TRAIN_LOSS[current_category]
+    if reward_type == Reward.VALIDATION_LOSS:
+        if not EVAL_LOSS["buffer"]:
+            EVAL_LOSS["buffer"] = [1e-100] * total_categories
+        EVAL_LOSS[last_sampled_category] = eval_loss_history[-1]["loss"]
+        return EVAL_LOSS[current_category]
+    if reward_type == Reward.GRADNORM:
+        if not GRADNORM["buffer"]:
+            GRADNORM["buffer"] = [1e-100] * total_categories
+        GRADNORM[last_sampled_category] = 1 / (
+            gradnorm_history[-1]["grad_norm"] + 0.0001
+        )
+        return GRADNORM[current_category]
     raise TypeError(f"Reward {reward_type} not supported")

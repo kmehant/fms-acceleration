@@ -262,7 +262,36 @@ class OnlineData(IterableDataset):
             )
         return self._update_sampling_ratio(self.sampling_weights)
 
-    def update_sampling_weights(self, model, accelerator, metrics):
+    def _extract_information_from_state_for_reward(self, state=None, category=None):
+        """Helper function to extract exact information that the reward computation
+        can consume. This function has to be expanded for new rewards.
+
+        Args:
+            state: HF TrainerState object. Defaults to None.
+
+        Returns:
+            dict: arguments prepared for compute_reward function
+        """
+        if state is None:
+            return {}
+        if self.reward_type.startswith(Reward.ENTROPY):
+            return {}
+        if self.reward_type == Reward.TRAIN_LOSS:
+            return {"train_loss_history": [d for d in state.log_history if "loss" in d]}
+        if self.reward_type == Reward.VALIDATION_LOSS:
+            assert category is not None
+            return {
+                "eval_loss_history": [
+                    d for d in state.log_history if f"eval_{category}_loss" in d
+                ]
+            }
+        if self.reward_type == Reward.GRADNORM:
+            return {
+                "gradnorm_history": [d for d in state.log_history if "grad_norm" in d]
+            }
+        return {}
+
+    def update_sampling_weights(self, model, accelerator, state):
         """Function to update MAB weights based on the reward type provided
         during the initialization. This function has to be updated if adding
         new reward types and based on their information needs from training loop.
@@ -272,7 +301,8 @@ class OnlineData(IterableDataset):
             is NOT the responsibility of this function.
             accelerator: Accelerate object, used for distributed operations. Should be None of single GPU runs.
             TODO: There is a hard dependency on accelerator which would be relaxed in future versions.
-            metrics: training metrics that can consumed by specific reward types
+            state: HF TrainerState object (other formats will be supported in the future).
+            For custom loop, please prepare your state class following TrainerState class.
         """
         rewards = [0] * self.total_categories
         count = [0] * self.total_categories
@@ -289,14 +319,24 @@ class OnlineData(IterableDataset):
                 eval_dataset_dict[self.id2cat[c]] = self.eval_dataset_dict_dl[
                     self.id2cat[c]
                 ]
-        for c in tqdm(range(self.total_categories), total=self.total_categories, desc="Categories"):
-            for batch in tqdm(eval_dataset_dict[self.id2cat[c]], desc="Reward computation over eval dataset"):
+        for c in tqdm(
+            range(self.total_categories), total=self.total_categories, desc="Categories"
+        ):
+            for batch in tqdm(
+                eval_dataset_dict[self.id2cat[c]],
+                desc="Reward computation over eval dataset",
+            ):
                 rc = compute_reward(
                     model=model,
                     batch={k: v.to(device) for k, v in batch.items()},
                     vocab_size=32000,
                     reward_type=self.reward_type,
-                    train_loop_metrics=metrics,
+                    current_category=c,
+                    total_categories=self.total_categories,
+                    last_sampled_category=self.arm_idx,
+                    **self._extract_information_from_state_for_reward(
+                        state, self.id2cat[c]
+                    ),
                 )
                 rewards[c] += rc
                 count[c] += batch["input_ids"].shape[0]
