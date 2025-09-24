@@ -276,6 +276,7 @@ class OnlineData(IterableDataset):
         rewards = [0] * self.total_categories
         count = [0] * self.total_categories
         eval_dataset_dict = {}
+        device = accelerator.device if accelerator else torch.device(0)
         self._reset_eval_dataloaders()
         for c in range(self.total_categories):
             # accelerator takes care of preparing the eval dataloaders for distributed inference.
@@ -291,15 +292,15 @@ class OnlineData(IterableDataset):
             for batch in eval_dataset_dict[self.id2cat[c]]:
                 rc = compute_reward(
                     model=model,
-                    batch={k: v.to(accelerator.device) for k, v in batch.items()},
+                    batch={k: v.to(device) for k, v in batch.items()},
                     vocab_size=32000,
                     reward_type=self.reward_type,
                     train_loop_metrics=metrics,
                 )
                 rewards[c] += rc
                 count[c] += batch["input_ids"].shape[0]
-        rewards = torch.tensor(rewards, device=accelerator.device)
-        count = torch.tensor(count, device=accelerator.device)
+        rewards = torch.tensor(rewards, device=device)
+        count = torch.tensor(count, device=device)
         rewards = accelerator.reduce(rewards, reduction="sum")
         count = accelerator.reduce(count, reduction="sum")
         if accelerator.is_main_process:
