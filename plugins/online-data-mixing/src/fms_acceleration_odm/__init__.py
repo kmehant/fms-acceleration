@@ -15,5 +15,5 @@
 
 # Local
 from .framework_plugin_odm import OnlineDataMixingAccelerationPlugin
-from .odm import compute_reward, OnlineData
+from .odm import compute_reward, OnlineData, Reward
 from .patch import patch_hf_for_odm
