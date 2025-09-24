@@ -8,14 +8,13 @@ from transformers import Trainer
 logger = getLogger(__name__)
 
 
-def patch_hf_for_odm():
+def patch_hf_trainer_evaluate():
     # Third Party
     # pylint: disable=import-outside-toplevel
     from fms_acceleration.model_patcher import patch_target_module
 
     Trainer._evaluate = _evaluate
     patch_target_module("transformers.trainer.Trainer", Trainer)
-    logger.debug("trainer _evaluate is patched")
 
 
 def _evaluate(self, trial, ignore_keys_for_eval, skip_scheduler=False):
@@ -57,9 +56,8 @@ def _evaluate(self, trial, ignore_keys_for_eval, skip_scheduler=False):
                 ) from exc
 
     if self.state.global_step % self.model.ta_update_interval == 0:
-        logger.info("ODM dataloader RL agent weight update step")
         # prepare model
-        # code taken from def evaluation_loop
+        # code taken from def evaluation_loop from HF
         model = self._wrap_model(self.model, training=False)
         args = self.args
         if len(self.accelerator._models) == 0 and model is self.model:

@@ -22,7 +22,7 @@ from transformers import TrainingArguments
 import torch
 
 # Local
-from .patch import patch_hf_for_odm
+from .patch import patch_hf_trainer_evaluate
 
 
 # pylint: disable=too-many-instance-attributes
@@ -33,10 +33,6 @@ class OnlineDataMixingAccelerationPlugin(AccelerationPlugin):
 
         self._update_interval = self._check_config_and_maybe_check_values(
             key="training.odm.odm.update_interval",
-            default=1,
-        )
-        self._sample_interval = self._check_config_and_maybe_check_values(
-            key="training.odm.odm.sample_interval",
             default=1,
         )
 
@@ -68,8 +64,7 @@ class OnlineDataMixingAccelerationPlugin(AccelerationPlugin):
         self, model: torch.nn.Module = None, accelerator=None
     ):
         callbacks = []
-        # patch_fms_hf_tuning_data_utils_for_odm()
-        patch_hf_for_odm()
+        patch_hf_trainer_evaluate()
         return callbacks
 
 

@@ -19,11 +19,11 @@ class Reward(StrEnum):
     GRADNORM = auto()
 
 
-TRAIN_LOSS = {"buffer": None}
+TRAIN_LOSS_DATA = {"buffer": []}
 
-EVAL_LOSS = {"buffer": None}
+EVAL_LOSS_DATA = {"buffer": []}
 
-GRADNORM = {"buffer": None}
+GRADNORM_DATA = {"buffer": []}
 
 
 def compute_reward(
@@ -51,9 +51,15 @@ def compute_reward(
             2. The metrics are averaged per sequence after applying the attention mask
 
         Train loss reward: TRAIN_LOSS
-        Categories giving higher train loss reward are chosen.
+        We maintain a buffer over all the categories capturing their train loss when sampled.
+        Higher train loss should reward more to choose from that category to bring this loss down.
+
         Validation loss reward: VALIDATION_LOSS
+        Similar to TRAIN_LOSS reward here we use individual category validation loss instead.
+
         Grad norm reward: GRADNORM
+        Similar to TRAIN_LOSS reward here we use overall gradnorm. However, Higher grad norm
+        categories should be less priortized.
 
     Args:
         model (PreTrainedModel): HF Model object
@@ -98,24 +104,26 @@ def compute_reward(
         if reward_type == Reward.ENTROPY:
             return entropy.sum().item()
         if reward_type == Reward.ENTROPY3_VARENT1:
-            return (0.75 * entropy.sum().item() + 0.25 * varentropy.sum().item(),)
+            return 0.75 * entropy.sum().item() + 0.25 * varentropy.sum().item()
         if reward_type == Reward.ENTROPY_LAST_TOKEN:
             return entropy_last_token.sum().item()
     if reward_type == Reward.TRAIN_LOSS:
-        if not TRAIN_LOSS["buffer"]:
-            TRAIN_LOSS["buffer"] = [1e-100] * total_categories
-        TRAIN_LOSS["buffer"][last_sampled_category] = train_loss_history[-1]["loss"]
-        return TRAIN_LOSS["buffer"][current_category]
+        if not TRAIN_LOSS_DATA["buffer"]:
+            TRAIN_LOSS_DATA["buffer"] = [1e-100] * total_categories
+        TRAIN_LOSS_DATA["buffer"][last_sampled_category] = train_loss_history[-1][
+            "loss"
+        ]
+        return TRAIN_LOSS_DATA["buffer"][current_category]
     if reward_type == Reward.VALIDATION_LOSS:
-        if not EVAL_LOSS["buffer"]:
-            EVAL_LOSS["buffer"] = [1e-100] * total_categories
-        EVAL_LOSS["buffer"][last_sampled_category] = eval_loss_history[-1]["loss"]
-        return EVAL_LOSS["buffer"][current_category]
+        if not EVAL_LOSS_DATA["buffer"]:
+            EVAL_LOSS_DATA["buffer"] = [1e-100] * total_categories
+        EVAL_LOSS_DATA["buffer"][current_category] = eval_loss_history[-1]["loss"]
+        return EVAL_LOSS_DATA["buffer"][current_category]
     if reward_type == Reward.GRADNORM:
-        if not GRADNORM["buffer"]:
-            GRADNORM["buffer"] = [1e-100] * total_categories
-        GRADNORM["buffer"][last_sampled_category] = 1 / (
+        if not GRADNORM_DATA["buffer"]:
+            GRADNORM_DATA["buffer"] = [1e-100] * total_categories
+        GRADNORM_DATA["buffer"][last_sampled_category] = 1 / (
             gradnorm_history[-1]["grad_norm"] + 0.0001
         )
-        return GRADNORM["buffer"][current_category]
+        return GRADNORM_DATA["buffer"][current_category]
     raise TypeError(f"Reward {reward_type} not supported")

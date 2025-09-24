@@ -106,7 +106,7 @@ class OnlineData(IterableDataset):
                     1,
                     shuffle=False,
                     num_workers=1,
-                    collate_fn=collators_dict[k],
+                    collate_fn=collators_dict[k] if collators_dict else None,
                 )
             )
         self.eval_batch_size = eval_batch_size
@@ -145,7 +145,11 @@ class OnlineData(IterableDataset):
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
         self.log_file_path = os.path.join(self.output_dir, "odm.jsonl")
-        logger.info(f"Logs for online data mixing to be stored at {self.log_file_path}")
+        logger.info(
+            "Logs for online data mixing to be stored at {log_file_path}".format(
+                log_file_path=self.log_file_path
+            )
+        )
         self.log = {
             "samples_produced_so_far": 0,
             "sampling_interval": self.sampling_interval,
@@ -185,18 +189,27 @@ class OnlineData(IterableDataset):
 
         # dataloader returns a batch of 1 sample
         # next should return single sample rather a batch
-        assert "input_ids" in sample
-        sample = {
-            "input_ids": sample["input_ids"][0],
-            "attention_mask": (
-                sample["attention_mask"][0]
-                if "attention_mask" in sample
-                else torch.ones_like(sample["input_ids"][0])
-            ),
-            "labels": (
-                sample["labels"][0] if "labels" in sample else sample["input_ids"][0]
-            ),
-        }
+        if isinstance(sample, torch.Tensor):
+            # (edge case) when no collators are passed
+            sample = {
+                "input_ids": sample[0],
+                "attention_mask": torch.ones_like(sample[0]),
+                "labels": sample[0],
+            }
+        else:
+            sample = {
+                "input_ids": sample["input_ids"][0],
+                "attention_mask": (
+                    sample["attention_mask"][0]
+                    if "attention_mask" in sample
+                    else torch.ones_like(sample["input_ids"][0])
+                ),
+                "labels": (
+                    sample["labels"][0]
+                    if "labels" in sample
+                    else sample["input_ids"][0]
+                ),
+            }
 
         self.log_to_file(
             {
@@ -222,7 +235,11 @@ class OnlineData(IterableDataset):
                     self.eval_batch_size,
                     shuffle=False,
                     num_workers=1,
-                    collate_fn=self.eval_collators_dict[k],
+                    collate_fn=(
+                        self.eval_collators_dict[k]
+                        if self.eval_collators_dict
+                        else None
+                    ),
                 )
             )
 
@@ -282,7 +299,9 @@ class OnlineData(IterableDataset):
             assert category is not None
             return {
                 "eval_loss_history": [
-                    d for d in state.log_history if f"eval_{category}_loss" in d
+                    {"loss": d[f"eval_{category}_loss"], **d}
+                    for d in state.log_history
+                    if f"eval_{category}_loss" in d
                 ]
             }
         if self.reward_type == Reward.GRADNORM:
@@ -299,8 +318,10 @@ class OnlineData(IterableDataset):
         Args:
             model: HF model object. Conversion of the model (train to inference mode)
             is NOT the responsibility of this function.
-            accelerator: Accelerate object, used for distributed operations. Should be None of single GPU runs.
-            TODO: There is a hard dependency on accelerator which would be relaxed in future versions.
+            accelerator: Accelerate object, used for distributed operations.
+            Should be None of single GPU runs.
+            TODO: There is a hard dependency on accelerator which would be relaxed
+            in future versions.
             state: HF TrainerState object (other formats will be supported in the future).
             For custom loop, please prepare your state class following TrainerState class.
         """
