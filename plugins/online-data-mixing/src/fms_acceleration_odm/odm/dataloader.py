@@ -255,7 +255,7 @@ class OnlineData(IterableDataset):
         """
 
         for arm in range(self.total_categories):
-            avg_r = rewards[arm] / count[arm]  # empirical reward
+            avg_r = rewards[arm] / count[arm]
             est_r = avg_r / self.sampling_ratio[arm]
             self.sampling_weights[arm] *= math.exp(
                 self.eta * est_r / self.total_categories

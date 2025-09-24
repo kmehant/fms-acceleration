@@ -27,6 +27,36 @@ def _evaluate(self, trial, ignore_keys_for_eval, skip_scheduler=False):
     # pylint: disable=import-outside-toplevel
     import torch
 
+    metrics = None
+    if (
+        self.model.ta_eval_steps
+        and self.state.global_step % self.model.ta_eval_steps == 0
+    ):
+        metrics = self.evaluate(ignore_keys=ignore_keys_for_eval)
+        self._report_to_hp_search(trial, self.state.global_step, metrics)
+
+        # Run delayed LR scheduler now that metrics are populated
+        if (
+            isinstance(self.lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau)
+            and not skip_scheduler
+        ):
+            metric_to_check = self.args.metric_for_best_model
+            if not metric_to_check.startswith("eval_"):
+                metric_to_check = f"eval_{metric_to_check}"
+            try:
+                self.lr_scheduler.step(metrics[metric_to_check])
+            except KeyError as exc:
+                raise KeyError(
+                    f"The `metric_for_best_model` training argument is "
+                    f"set to '{metric_to_check}', "
+                    f"which is not found in the evaluation metrics. "
+                    f"The available evaluation metrics are: {list(metrics.keys())}."
+                    f"Please ensure that the `compute_metrics` function returns a "
+                    f"dictionary that includes '{metric_to_check}' or "
+                    f"consider changing the `metric_for_best_model` via the TrainingArguments."
+                ) from exc
+    print("self.state", self.state)
+    print("self.state.log_history", self.state.log_history)
     if self.state.global_step % self.model.ta_update_interval == 0:
         logger.info("ODM dataloader RL agent weight update step")
         # prepare model
@@ -76,31 +106,5 @@ def _evaluate(self, trial, ignore_keys_for_eval, skip_scheduler=False):
             self._past = None
         # prepare dataloader
         self.train_dataset.update_sampling_weights(model, self.accelerator, None)
-    if (
-        self.model.ta_eval_steps
-        and self.state.global_step % self.model.ta_eval_steps == 0
-    ):
-        metrics = self.evaluate(ignore_keys=ignore_keys_for_eval)
-        self._report_to_hp_search(trial, self.state.global_step, metrics)
 
-        # Run delayed LR scheduler now that metrics are populated
-        if (
-            isinstance(self.lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau)
-            and not skip_scheduler
-        ):
-            metric_to_check = self.args.metric_for_best_model
-            if not metric_to_check.startswith("eval_"):
-                metric_to_check = f"eval_{metric_to_check}"
-            try:
-                self.lr_scheduler.step(metrics[metric_to_check])
-            except KeyError as exc:
-                raise KeyError(
-                    f"The `metric_for_best_model` training argument is "
-                    f"set to '{metric_to_check}', "
-                    f"which is not found in the evaluation metrics. "
-                    f"The available evaluation metrics are: {list(metrics.keys())}."
-                    f"Please ensure that the `compute_metrics` function returns a "
-                    f"dictionary that includes '{metric_to_check}' or "
-                    f"consider changing the `metric_for_best_model` via the TrainingArguments."
-                ) from exc
-        return metrics
+    return metrics
