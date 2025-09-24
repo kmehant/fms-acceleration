@@ -26,7 +26,8 @@ class OnlineData(IterableDataset):
             eta: float = 0.3,
             sampling_interval: int = 1, # sample data category every 1 sample,
             eval_batch_size: int = 5,
-            output_dir="odm"
+            output_dir="odm",
+            reward_type=Reward.ENTROPY,
         ):
         """
         Mixes datasets with sampling ratios learnt using Multi Armed Bandit (MAB) and rewards defined.
@@ -67,7 +68,7 @@ class OnlineData(IterableDataset):
         self.curr_idx = [0] * self.total_categories
         self.produced = 0
         self.arm_idx = 0
-        self.reward_type = Reward.ENTROPY
+        self.reward_type = reward_type
         self.output_dir = output_dir
         self.K = self.total_categories
         if not os.path.exists(self.output_dir):
