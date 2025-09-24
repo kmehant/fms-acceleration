@@ -100,14 +100,14 @@ class OnlineData(IterableDataset):
         self.train_dataset_dict_dl = {}
         # prepare torch dataloaders for each of the dataset.
         for k, _ in dataset_dict.items():
-            self.dataset_dict[k] = DataLoader(
+            dataset_dict[k] = DataLoader(
                 dataset_dict[k],
                 1,
                 shuffle=False,
                 num_workers=1,
                 collate_fn=collators_dict[k] if collators_dict else None,
             )
-            self.train_dataset_dict_dl[k] = iter(self.dataset_dict[k])
+            self.train_dataset_dict_dl[k] = iter(dataset_dict[k])
         self.eval_batch_size = eval_batch_size
         self.dataset_dict = dataset_dict
         self.eval_dataset_dict = eval_dataset_dict
