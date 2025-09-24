@@ -104,18 +104,18 @@ def compute_reward(
     if reward_type == Reward.TRAIN_LOSS:
         if not TRAIN_LOSS["buffer"]:
             TRAIN_LOSS["buffer"] = [1e-100] * total_categories
-        TRAIN_LOSS[last_sampled_category] = train_loss_history[-1]["loss"]
-        return TRAIN_LOSS[current_category]
+        TRAIN_LOSS["buffer"][last_sampled_category] = train_loss_history[-1]["loss"]
+        return TRAIN_LOSS["buffer"][current_category]
     if reward_type == Reward.VALIDATION_LOSS:
         if not EVAL_LOSS["buffer"]:
             EVAL_LOSS["buffer"] = [1e-100] * total_categories
-        EVAL_LOSS[last_sampled_category] = eval_loss_history[-1]["loss"]
-        return EVAL_LOSS[current_category]
+        EVAL_LOSS["buffer"][last_sampled_category] = eval_loss_history[-1]["loss"]
+        return EVAL_LOSS["buffer"][current_category]
     if reward_type == Reward.GRADNORM:
         if not GRADNORM["buffer"]:
             GRADNORM["buffer"] = [1e-100] * total_categories
-        GRADNORM[last_sampled_category] = 1 / (
+        GRADNORM["buffer"][last_sampled_category] = 1 / (
             gradnorm_history[-1]["grad_norm"] + 0.0001
         )
-        return GRADNORM[current_category]
+        return GRADNORM["buffer"][current_category]
     raise TypeError(f"Reward {reward_type} not supported")
