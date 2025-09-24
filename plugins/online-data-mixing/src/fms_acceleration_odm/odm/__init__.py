@@ -15,4 +15,4 @@
 
 # Local
 from .dataloader import OnlineData
-from .reward import compute_reward, Reward
+from .reward import Reward, compute_reward

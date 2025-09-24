@@ -28,7 +28,6 @@ from .patch import patch_hf_for_odm
 # pylint: disable=too-many-instance-attributes
 class OnlineDataMixingAccelerationPlugin(AccelerationPlugin):
 
-
     def __init__(self, configurations: Dict[str, Dict]):
         super().__init__(configurations)
 
@@ -40,6 +39,7 @@ class OnlineDataMixingAccelerationPlugin(AccelerationPlugin):
             key="training.odm.odm.sample_interval",
             default=1,
         )
+
     # data_config file should be there
     @property
     def requires_augmentation(self):
@@ -59,7 +59,7 @@ class OnlineDataMixingAccelerationPlugin(AccelerationPlugin):
         train_args.eval_steps = 1
         train_args.eval_strategy = "steps"
 
-        # update_interval information has to be made available in the evaluate HF patch 
+        # update_interval information has to be made available in the evaluate HF patch
         # function and this seems to be the only reasonable way to do so
         model.ta_update_interval = self._update_interval
         return model, modifiable_args
