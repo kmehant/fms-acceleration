@@ -69,6 +69,9 @@ class OnlineData(IterableDataset):
         self.produced = 0
         self.arm_idx = 0
         self.reward_type = reward_type
+        if isinstance(self.reward_type, str):
+            self.reward_type = self.reward_type.upper()
+            self.reward_type = Reward[self.reward_type]
         self.output_dir = output_dir
         self.K = self.total_categories
         if not os.path.exists(self.output_dir):
