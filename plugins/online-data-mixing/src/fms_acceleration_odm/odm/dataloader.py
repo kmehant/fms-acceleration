@@ -97,22 +97,21 @@ class OnlineData(IterableDataset):
         self.eval_collators_dict = eval_collators_dict
         self.eval_dataset_dict = eval_dataset_dict
         self.eval_dataset_dict_dl = {}
-
+        self.train_dataset_dict_dl = {}
         # prepare torch dataloaders for each of the dataset.
         for k, _ in dataset_dict.items():
-            dataset_dict[k] = iter(
-                DataLoader(
-                    dataset_dict[k],
-                    1,
-                    shuffle=False,
-                    num_workers=1,
-                    collate_fn=collators_dict[k] if collators_dict else None,
-                )
+            self.dataset_dict[k] = DataLoader(
+                dataset_dict[k],
+                1,
+                shuffle=False,
+                num_workers=1,
+                collate_fn=collators_dict[k] if collators_dict else None,
             )
+            self.train_dataset_dict_dl[k] = iter(self.dataset_dict[k])
         self.eval_batch_size = eval_batch_size
         self.dataset_dict = dataset_dict
         self.eval_dataset_dict = eval_dataset_dict
-        self.category_list = sorted(dataset_dict.keys())
+        self.category_list = sorted(self.train_dataset_dict_dl.keys())
         self.id2cat = dict(enumerate(self.category_list))
         self.cat2id = {c: i for i, c in enumerate(self.category_list)}
         self.total_categories = len(self.category_list)
@@ -182,8 +181,18 @@ class OnlineData(IterableDataset):
             self.arm_idx = random.choices(
                 range(self.total_categories), weights=self.sampling_ratio, k=1
             )[0]
+        sample = None
+        try:
+            sample = next(self.train_dataset_dict_dl[self.id2cat[self.arm_idx]])
+        except StopIteration:
+            logger.info(
+                f"{self.id2cat[self.arm_idx]} dataset exhausted so the iterator is reset."
+            )
+            self.train_dataset_dict_dl[self.id2cat[self.arm_idx]] = iter(
+                self.dataset_dict[self.id2cat[self.arm_idx]]
+            )
+            sample = next(self.train_dataset_dict_dl[self.id2cat[self.arm_idx]])
 
-        sample = next(self.dataset_dict[self.id2cat[self.arm_idx]])
         self.curr_cat_count[self.arm_idx] += 1
         self.produced += 1
 

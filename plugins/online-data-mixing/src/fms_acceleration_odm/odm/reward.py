@@ -118,17 +118,21 @@ def compute_reward(
         return TRAIN_LOSS_DATA["buffer"][current_category]
     if reward_type == Reward.VALIDATION_LOSS:
         if not eval_loss_history:
-            raise ValueError("eval_loss_history cannot be a empty list or None."
-                             "Make sure you are using eval_strategy and eval_steps"
-                             "allowing atleast 1 evaluation before reward computation.")
+            raise ValueError(
+                "eval_loss_history cannot be a empty list or None."
+                "Make sure you are using eval_strategy and eval_steps"
+                "allowing atleast 1 evaluation before reward computation."
+            )
         if not EVAL_LOSS_DATA["buffer"]:
             EVAL_LOSS_DATA["buffer"] = [1e-100] * total_categories
         EVAL_LOSS_DATA["buffer"][current_category] = eval_loss_history[-1]["loss"]
         return EVAL_LOSS_DATA["buffer"][current_category]
     if reward_type == Reward.GRADNORM:
         if not gradnorm_history:
-            raise ValueError("gradnorm_history cannot be a empty list or None."
-                             "Make sure grad norm is made available.")
+            raise ValueError(
+                "gradnorm_history cannot be a empty list or None."
+                "Make sure grad norm is made available."
+            )
         if not GRADNORM_DATA["buffer"]:
             GRADNORM_DATA["buffer"] = [1e-100] * total_categories
         GRADNORM_DATA["buffer"][last_sampled_category] = 1 / (
