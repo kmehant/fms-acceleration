@@ -186,7 +186,9 @@ class OnlineData(IterableDataset):
             sample = next(self.train_dataset_dict_dl[self.id2cat[self.arm_idx]])
         except StopIteration:
             logger.info(
-                f"{self.id2cat[self.arm_idx]} dataset exhausted so the iterator is reset."
+                "{id} dataset exhausted so the iterator is reset.".format(
+                    id=self.id2cat[self.arm_idx]
+                )
             )
             self.train_dataset_dict_dl[self.id2cat[self.arm_idx]] = iter(
                 self.dataset_dict[self.id2cat[self.arm_idx]]
